@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Al-Jazari Museum</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="intro">
+    <div class="card">
+      <p class="ar">بديع الزمان الجزري</p>
+      <h1>Al-Jazari</h1>
+      <p class="sub">A virtual museum of the engineer often called the father of robotics<br>Diyarbakır · 1136 – 1206</p>
+      <div class="rule"><span>✦</span></div>
+      <div class="controls" id="controls-help">
+        <div><b>Desktop</b>W A S D to walk · mouse to look · Shift to hurry · click a glowing gem or peg to operate a machine · Esc to release the mouse</div>
+        <div><b>Phone / tablet</b>Drag the left side to walk · drag the right side to look · tap a gem or peg</div>
+        <div><b>VR headset</b>Press “Enter VR” · point and pull the trigger to teleport or operate · left stick walks, right stick turns</div>
+      </div>
+      <button id="enter" disabled>Building the hall…</button>
+      <p class="note">Sound on for the full experience</p>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="reticle"></div>
+    <div id="label"></div>
+    <div id="hint">Click to look around</div>
+  </div>
+  <div id="stick"><div id="knob"></div></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
