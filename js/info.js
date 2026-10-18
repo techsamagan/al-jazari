@@ -4,7 +4,7 @@ export const INFO = {
     arabic: 'بديع الزمان الجزري',
     title: 'Al-Jazari',
     date: 'c. 1136 – 1206 · Diyarbakır',
-    body: 'Badīʿ al-Zamān Abū al-ʿIzz ibn Ismāʿīl ibn al-Razzāz al-Jazarī served the Artuqid rulers of Diyarbakır as chief engineer for some twenty-five years. His name comes from al-Jazīra, the land between the Tigris and the Euphrates.\nHe built water clocks, fountains, pumps and automata that performed sequences of actions using water power, floats, cams, pegs and gears. For this he is often called the "father of robotics".\nEvery machine in this hall is an interpretive reconstruction after the drawings in his book. Walk up to each one and touch its glowing gem to set it in motion.',
+    body: 'Badīʿ al-Zamān Abū al-ʿIzz ibn Ismāʿīl ibn al-Razzāz al-Jazarī served the Artuqid rulers of Diyarbakır as chief engineer for some twenty-five years. His name comes from al-Jazīra, the land between the Tigris and the Euphrates.\nHe built water clocks, fountains, pumps and automata that performed sequences of actions using water power, floats, cams, pegs and gears. For this he is often called the "father of robotics".\nEvery machine in this hall is an interpretive reconstruction after the drawings in his book. Walk up to each one and press its brass button to set it in motion.',
   },
   book: {
     arabic: 'كتاب في معرفة الحيل الهندسية',
@@ -18,7 +18,7 @@ export const INFO = {
     date: 'Category I · Clocks',
     body: 'Inside the elephant, a perforated bowl slowly sinks in a water tank. Each half hour, as the bowl reaches the bottom, it pulls cords that tip a ball from a falcon into a serpent\'s mouth. The serpent swings down to drop the ball into a vase, the mahout strikes, and the phoenix on the dome turns. The bowl then resets itself. Meanwhile the scribe on the platform slowly rotates, pointing to the minutes.\nThe clock is often described as a celebration of many cultures: an Indian elephant, Chinese-style dragons, an Egyptian phoenix, a Persian carpet and Arab figures.',
     activate: 'Release the next ball',
-    hint: 'Touch the gem — or the elephant — to release a ball',
+    hint: 'Press the brass button (or click the elephant) to release a ball',
   },
   boat: {
     arabic: 'زورق الموسيقيين',
@@ -34,7 +34,7 @@ export const INFO = {
     date: 'Category III · Pitchers & basins for washing',
     body: 'Made for a king who disliked being helped by servants when washing before prayer. Water pours from the peacock\'s beak into a basin. As the basin drains, a hidden float mechanism opens a small door and a servant figure comes out offering soap. A second figure follows with a towel.\nThe mechanism that empties the water and resets the device is sometimes compared to the modern flush. His other washing devices included a standing servant figure who poured water from a jug.',
     activate: 'Wash your hands',
-    hint: 'Touch the gem to fan the tail and start the water',
+    hint: 'Press the brass button to fan the tail and start the water',
   },
   drink: {
     arabic: 'الجارية الساقية',
@@ -42,7 +42,7 @@ export const INFO = {
     date: 'Category II · Vessels for drinking sessions',
     body: 'Al-Jazari designed several vessels and figures to serve drinks at royal gatherings. Their timing came from water flowing between hidden reservoirs, controlled by siphons and floats. When enough liquid had passed, a figure would move to fill or present a cup.\nThis reconstruction shows the principle. The glass reservoir on the roof empties as a servant figure steps forward, pours from a jug into a cup and offers it to the guest.',
     activate: 'Request a drink',
-    hint: 'Touch the gem to be served',
+    hint: 'Press the brass button to be served',
   },
   pump: {
     arabic: 'المضخة ذات الأسطوانتين',
@@ -50,15 +50,15 @@ export const INFO = {
     date: 'Category V · Water-raising machines',
     body: 'A paddle wheel in a stream turns a pair of gears. A pin on the upper gear runs in the slot of a long swinging rod. As the rod rocks from side to side, it drives two pistons in opposing cylinders. While one piston draws water in through its suction pipe, the other forces water up the delivery pipe. That is what makes the pump double-acting.\nIt is often cited as one of the earliest known machines to combine a crank-type motion, a connecting rod and suction pipes, which later became central to pumps and engines.',
     activate: 'Send a surge of water',
-    hint: 'Touch the gem to speed up the water wheel',
+    hint: 'Press the brass button to speed up the water wheel',
   },
   saqiya: {
     arabic: 'الساقية',
     title: 'The Saqiya',
     date: 'Category V · Water-raising machines',
-    body: 'The saqiya was already ancient by al-Jazari\'s time. An animal walks in a circle, turning a vertical shaft. Gears transfer the motion to a wheel over a well, and a chain of pots dips into the water and tips it out at the top.\nAl-Jazari described improved versions. In one, the driving power came from a hidden water wheel, and a model cow on top only appeared to turn the machine. This reconstruction shows the classic animal-driven form.',
-    activate: 'Urge the ox on',
-    hint: 'Touch the gem to quicken the ox',
+    body: 'The saqiya was already ancient by al-Jazari\'s time. A draught animal walks in a circle, turning a vertical shaft. Gears transfer the motion to a wheel over a well, and a chain of pots dips into the water and tips it into a trough at the top.\nAl-Jazari described a version driven by a hidden water wheel. It carried a carved model animal on its sweep, so the figure only appeared to be turning the machine. This reconstruction shows that idea. A marble horse statue stands in for al-Jazari\'s model cow and rides the sweep while the gears turn.',
+    activate: 'Speed up the hidden water wheel',
+    hint: 'Press the brass button to speed up the hidden water wheel',
   },
   castle: {
     arabic: 'ساعة القلعة',
@@ -66,7 +66,7 @@ export const INFO = {
     date: 'Category I · Clocks',
     body: 'A monumental water clock, about 3.4 m tall in al-Jazari\'s description. Every hour a door in the upper gallery opens to reveal a figure, and the crescent moon moves one place along the track. Falcons lean forward and drop balls into vases with a clang, and a band of musicians plays drums, trumpets and cymbals. At night, a row of lamps lit up one by one, and the zodiac disc tracked the sun and moon.\nBecause the length of its hours could be adjusted to suit the changing length of day across the seasons, it is often described as an early programmable analog computer.',
     activate: 'Advance one hour',
-    hint: 'Touch the gem — or the clock — to advance one hour',
+    hint: 'Press the brass button (or click the clock) to advance one hour',
   },
 };
-for (const v of Object.values(INFO)) if (v.activate && !v.hint) v.hint = 'Touch the gem to activate';
+for (const v of Object.values(INFO)) if (v.activate && !v.hint) v.hint = 'Press the brass button to activate';

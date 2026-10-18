@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { initMaterials, animated } from './parts.js';
+import { loadAssets, A } from './assets.js';
+import { createPost } from './post.js';
 import { buildHall } from './hall.js';
 import { buildExhibits } from './exhibits.js';
 import { Controls } from './controls.js';
@@ -15,8 +16,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.92;
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.45;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.xr.enabled = true;
@@ -25,10 +26,11 @@ renderer.xr.setFoveation(1);
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a120b);
-scene.fog = new THREE.Fog(0x1f150c, 30, 80);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.background = new THREE.Color(0x0c0907);
+scene.fog = new THREE.Fog(0x14100b, 35, 90);
+const params = new URLSearchParams(location.search);
+const useFx = params.get('fx') !== '0';
+let post = null;
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 160);
 camera.position.set(0, 1.6, 0);
@@ -55,6 +57,12 @@ const ctx = {
 };
 
 async function init() {
+  const btn = $('enter');
+  await loadAssets(renderer, (p) => { btn.textContent = `Loading the collection… ${Math.round(p * 100)}%`; });
+  btn.textContent = 'Building the hall…';
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(A.hdri).texture;
+  A.hdri.dispose(); pmrem.dispose();
   const fonts = ['700 64px Cinzel', '400 34px "EB Garamond"', 'italic 34px "EB Garamond"', '700 60px Amiri'];
   await Promise.race([
     Promise.all(fonts.map((f) => document.fonts.load(f, f.includes('Amiri') ? 'الجزري' : 'Aa'))).catch(() => {}),
@@ -67,19 +75,23 @@ async function init() {
     renderer, camera, rig, scene, isTouch,
     floor: hall.floor,
     interactables: ctx.interactables,
-    colliders: exhibits.colliders,
+    colliders: [...exhibits.colliders, ...hall.colliders],
     bounds: hall.bounds,
   });
   controls.onLockChange = (locked) => {
     $('reticle').style.display = locked ? 'block' : 'none';
     $('hint').style.display = !locked && started && !renderer.xr.isPresenting ? 'block' : 'none';
   };
+  // the HDRI is a bright gallery; keep it as subtle bounce light + reflections
   scene.traverse((o) => {
     if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
-    o.material.envMapIntensity = o.material.metalness > 0.5 ? 1.0 : 0.45;
+    const m = o.material;
+    if (m.userData.envSet) return;
+    m.userData.envSet = true;
+    m.envMapIntensity = (m.envMapIntensity !== 1 ? m.envMapIntensity : 1) * (m.metalness > 0.5 ? 0.7 : 0.32);
   });
+  if (useFx) post = createPost(renderer, scene, camera);
   renderer.compile(scene, camera);
-  const btn = $('enter');
   btn.disabled = false;
   btn.textContent = 'Enter the Museum';
   btn.addEventListener('click', start);
@@ -107,7 +119,7 @@ function start() {
   sound.start();
   controls.enabled = true;
   if (!isTouch && !renderer.xr.isPresenting) controls.lock();
-  if (isTouch) { $('hint').textContent = 'Left: walk · Right: look · Tap a gem'; $('hint').style.display = 'block'; setTimeout(() => ($('hint').style.display = 'none'), 5000); }
+  if (isTouch) { $('hint').textContent = 'Left: walk · Right: look · Tap a button'; $('hint').style.display = 'block'; setTimeout(() => ($('hint').style.display = 'none'), 5000); }
 }
 
 // ---------- VR ----------
@@ -118,16 +130,21 @@ if (navigator.xr) {
 }
 renderer.xr.addEventListener('sessionstart', () => {
   start();
+  for (const l of exhibits.spots) l.castShadow = false; // keep the headset at frame rate
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
   $('hint').style.display = 'none';
 });
-renderer.xr.addEventListener('sessionend', () => { renderer.shadowMap.autoUpdate = true; });
+renderer.xr.addEventListener('sessionend', () => {
+  for (const l of exhibits.spots) l.castShadow = true;
+  renderer.shadowMap.autoUpdate = true;
+});
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  if (post) post.setSize(innerWidth, innerHeight);
 });
 
 // ---------- loop ----------
@@ -150,7 +167,7 @@ function loop() {
   const hov = controls.hovered;
   for (const o of ctx.interactables) {
     const g = o.userData.glow;
-    if (g) g.emissiveIntensity = o === hov ? 2.5 : g.userData.pulse ? 0.9 + Math.sin(t * 3) * 0.35 : 0;
+    if (g) g.emissiveIntensity = o === hov ? 2.5 : g.userData.pulse ? 0.6 + Math.sin(t * 2.5) * 0.25 : 0;
   }
   $('reticle').classList.toggle('active', !!hov);
 
@@ -163,7 +180,13 @@ function loop() {
   }
   if (label !== lastLabel) { lastLabel = label; const el = $('label'); el.textContent = label; el.classList.toggle('on', !!label); }
 
-  renderer.render(scene, camera);
+  if (post && !renderer.xr.isPresenting) post.render(dt);
+  else renderer.render(scene, camera);
 }
 
-init();
+init().catch((e) => {
+  console.error(e);
+  const btn = $('enter');
+  btn.textContent = 'Could not load the collection — check that assets/ exists (python3 tools/fetch_assets.py) and reload';
+  btn.style.fontSize = '13px';
+});

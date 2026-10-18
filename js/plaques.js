@@ -67,26 +67,25 @@ export function makePlaque(ctx, info, { x, z, rotY = 0, onActivate = null, activ
   const panel = new THREE.Group(); panel.position.set(0, 0.98, -0.05); panel.rotation.x = -0.72; grp.add(panel);
   box(0.98, 1.21, 0.04, M.bronze, panel, 0, 0, -0.025);
   const t = TX.tex(plaqueCanvas(info), { wrap: false });
-  const mat = new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.5, roughness: 0.6 });
+  const mat = new THREE.MeshStandardMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.16, roughness: 0.55 });
   mesh(new THREE.PlaneGeometry(0.9, 1.125), mat, panel, 0, 0, 0.001);
   grp.traverse((o) => { if (o.isMesh) o.castShadow = true; });
 
+  // a brass push-button on its own post, with a softly lit ring (glows brighter on hover)
   let gem = null, gemMat = null;
   if (onActivate) {
-    cyl(0.02, 0.03, 0.85, M.bronze, grp, 0.62, 0.43, 0.12, 10);
-    cyl(0.07, 0.03, 0.06, M.gold, grp, 0.62, 0.88, 0.12, 12);
-    gemMat = new THREE.MeshStandardMaterial({ color: 0x2fd0c0, emissive: 0x1fbfb0, emissiveIntensity: 1, roughness: 0.12, metalness: 0.3 });
+    cyl(0.02, 0.03, 0.9, M.bronze, grp, 0.62, 0.45, 0.12, 12);
+    const head = new THREE.Group(); head.position.set(0.62, 0.92, 0.12); head.rotation.x = 0.5; grp.add(head);
+    cyl(0.075, 0.08, 0.05, M.bronze, head, 0, 0, 0, 28);
+    gemMat = new THREE.MeshStandardMaterial({ color: 0x0c2a28, emissive: 0x3fd8c8, emissiveIntensity: 1, roughness: 0.3 });
     gemMat.userData.pulse = true;
-    gem = mesh(new THREE.OctahedronGeometry(0.075), gemMat, grp, 0.62, 1.02, 0.12);
-    const hit = mesh(new THREE.SphereGeometry(0.17, 8, 6), M.hit, grp, 0.62, 1.02, 0.12);
+    mesh(new THREE.TorusGeometry(0.058, 0.008, 8, 32), gemMat, head, 0, 0.026, 0).rotation.x = Math.PI / 2;
+    gem = cyl(0.045, 0.048, 0.03, M.brass, head, 0, 0.035, 0, 28);
+    const hit = mesh(new THREE.SphereGeometry(0.17, 8, 6), M.hit, grp, 0.62, 0.95, 0.12);
     ctx.addInteractable(hit, activateLabel, onActivate, gemMat);
   }
   return {
     group: grp,
-    update(time) {
-      if (!gem) return;
-      gem.rotation.y = time * 1.5;
-      gem.position.y = 1.02 + Math.sin(time * 2) * 0.02;
-    },
+    update() {},
   };
 }

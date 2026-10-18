@@ -119,20 +119,26 @@ export function floorCanvas() {
   return c;
 }
 
-export function starTileCanvas() {
+export function starTileCanvas(mode) {
   const S = 512, T = 128;
   const c = canvas(S); const g = c.getContext('2d');
-  g.fillStyle = '#efe6d2'; g.fillRect(0, 0, S, S);
+  const hm = mode === 'height';
+  g.fillStyle = hm ? '#fff' : '#e2d9c6'; g.fillRect(0, 0, S, S);
   for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
     const cx = x * T + T / 2, cy = y * T + T / 2;
-    star8(g, cx, cy, 54, '#1d3f8f', '#e6d39f', 5);
-    star8(g, cx, cy, 24, '#e9bf5d', '#7a5a1c', 2);
+    star8(g, cx, cy, 54, hm ? '#fff' : '#243f6e', hm ? '#000' : '#d9cba4', 5);
+    star8(g, cx, cy, 24, hm ? '#fff' : '#a8823c', hm ? '#000' : '#5e461c', 2);
   }
   for (let y = 0; y <= 4; y++) for (let x = 0; x <= 4; x++) {
-    poly(g, x * T, y * T, 28, 4, 0, '#1fa3a0', '#e6d39f', 4);
-    poly(g, x * T, y * T, 10, 4, Math.PI / 4, '#9a2219', null);
+    poly(g, x * T, y * T, 28, 4, 0, hm ? '#fff' : '#2e706c', hm ? '#000' : '#d9cba4', 4);
+    poly(g, x * T, y * T, 10, 4, Math.PI / 4, hm ? '#fff' : '#6e2a22', null);
   }
-  g.strokeStyle = 'rgba(60,40,20,.25)'; g.lineWidth = 2;
+  if (!hm) {
+    const img = g.getImageData(0, 0, S, S), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (fbm((i / 4 % S) / S * 8, ((i / 4 / S) | 0) / S * 8, 8, 3) - 0.5) * 22; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(img, 0, 0);
+  }
+  g.strokeStyle = hm ? '#000' : 'rgba(60,40,20,.45)'; g.lineWidth = hm ? 5 : 3;
   for (let i = 0; i <= 4; i++) {
     g.beginPath(); g.moveTo(i * T, 0); g.lineTo(i * T, S); g.stroke();
     g.beginPath(); g.moveTo(0, i * T); g.lineTo(S, i * T); g.stroke();
@@ -170,30 +176,31 @@ export function woodCanvas() {
   });
 }
 
-export function ceilingCanvas() {
+export function ceilingCanvas(mask = false) {
   const S = 1024, T = 256;
   const c = canvas(S); const g = c.getContext('2d');
-  g.drawImage(woodCanvas(), 0, 0, S, S);
-  g.fillStyle = 'rgba(30,16,8,.45)'; g.fillRect(0, 0, S, S);
-  g.strokeStyle = '#d4a84c'; g.lineWidth = 5;
+  if (mask) { g.fillStyle = '#000'; g.fillRect(0, 0, S, S); }
+  else { g.drawImage(woodCanvas(), 0, 0, S, S); g.fillStyle = 'rgba(30,16,8,.55)'; g.fillRect(0, 0, S, S); }
+  const au = mask ? '#fff' : '#b8913f', blue = mask ? '#000' : '#1e2c4f', red = mask ? '#000' : '#5e2a20', tq = mask ? '#000' : '#2e5f5c';
+  g.strokeStyle = au; g.lineWidth = 5;
   for (let i = 0; i <= 4; i++) {
     g.beginPath(); g.moveTo(i * T, 0); g.lineTo(i * T, S); g.stroke();
     g.beginPath(); g.moveTo(0, i * T); g.lineTo(S, i * T); g.stroke();
   }
   for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
     const cx = x * T + T / 2, cy = y * T + T / 2;
-    star8(g, cx, cy, 96, '#1b2f63', '#d4a84c', 6);
-    star8(g, cx, cy, 52, '#8e2a1f', '#e6c06a', 3);
-    star8(g, cx, cy, 20, '#e6c06a', null);
+    star8(g, cx, cy, 96, blue, au, 6);
+    star8(g, cx, cy, 52, red, au, 3);
+    star8(g, cx, cy, 20, au, null);
   }
-  for (let y = 0; y <= 4; y++) for (let x = 0; x <= 4; x++) poly(g, x * T, y * T, 30, 8, Math.PI / 8, '#1fa3a0', '#d4a84c', 4);
+  for (let y = 0; y <= 4; y++) for (let x = 0; x <= 4; x++) poly(g, x * T, y * T, 30, 8, Math.PI / 8, tq, au, 4);
   return c;
 }
 
 export function carpetCanvas() {
   const W = 512, H = 1024;
   const c = canvas(W, H); const g = c.getContext('2d');
-  g.fillStyle = '#7e1712'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#4e1a15'; g.fillRect(0, 0, W, H);
   // lattice
   g.strokeStyle = 'rgba(40,6,4,.6)'; g.lineWidth = 3;
   for (let i = -8; i < 16; i++) {
@@ -202,16 +209,22 @@ export function carpetCanvas() {
   }
   for (let k = 0; k < 2; k++) {
     const cy = k * 512 + 256;
-    poly(g, W / 2, cy, 150, 4, 0, '#16224a', '#e3b85a', 6);
-    star8(g, W / 2, cy, 96, '#efe2c6', '#16224a', 4);
-    star8(g, W / 2, cy, 44, '#c89a3c', null);
+    poly(g, W / 2, cy, 150, 4, 0, '#22283a', '#7d6640', 6);
+    star8(g, W / 2, cy, 96, '#8f7c5c', '#22283a', 4);
+    star8(g, W / 2, cy, 44, '#5e4426', null);
   }
   for (const x of [0, W - 56]) {
-    g.fillStyle = '#16224a'; g.fillRect(x, 0, 56, H);
-    g.fillStyle = '#e3b85a';
-    for (let y = 0; y < H; y += 32) poly(g, x + 28, y + 16, 10, 4, 0, '#e3b85a', null);
-    g.fillStyle = '#c89a3c'; g.fillRect(x === 0 ? 56 : x - 6, 0, 6, H);
+    g.fillStyle = '#1c2440'; g.fillRect(x, 0, 56, H);
+    for (let y = 0; y < H; y += 32) poly(g, x + 28, y + 16, 10, 4, 0, '#a88a4e', null);
+    g.fillStyle = '#6e5430'; g.fillRect(x === 0 ? 56 : x - 6, 0, 6, H);
   }
+  const img = g.getImageData(0, 0, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const px = (i / 4) % W, py = (i / 4 / W) | 0;
+    const n = (fbm(px / W * 8, py / H * 16, 8, 3) - 0.5) * 34 + (Math.random() - 0.5) * 14;
+    d[i] += n; d[i + 1] += n * 0.8; d[i + 2] += n * 0.7;
+  }
+  g.putImageData(img, 0, 0);
   return c;
 }
 
@@ -335,16 +348,17 @@ export function glowCanvas() {
   return c;
 }
 
-export function friezeCanvas() {
+export function friezeCanvas(mask = false) {
   const W = 2048, H = 160;
   const c = canvas(W, H); const g = c.getContext('2d');
-  g.fillStyle = '#132a5c'; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#d9b25f'; g.fillRect(0, 8, W, 6); g.fillRect(0, H - 14, W, 6);
-  g.fillStyle = '#8e2a1f'; g.fillRect(0, 0, W, 8); g.fillRect(0, H - 8, W, 8);
-  g.fillStyle = '#e8c56c'; g.font = '700 84px Amiri, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const bg = mask ? '#000' : '#1a2b4f', au = mask ? '#fff' : '#c9a24f';
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.fillStyle = au; g.fillRect(0, 8, W, 6); g.fillRect(0, H - 14, W, 6);
+  g.fillStyle = mask ? '#000' : '#5e2a20'; g.fillRect(0, 0, W, 8); g.fillRect(0, H - 8, W, 8);
+  g.fillStyle = au; g.font = '700 84px Amiri, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('بديع الزمان أبو العز الجزري', 512, H / 2 + 6);
   g.fillText('كتاب في معرفة الحيل الهندسية', 1536, H / 2 + 6);
-  for (const x of [0, 1024, 2048]) star8(g, x, H / 2, 46, '#e8c56c', '#132a5c', 3);
+  for (const x of [0, 1024, 2048]) star8(g, x, H / 2, 46, au, bg, 3);
   return c;
 }
 
@@ -372,7 +386,7 @@ export function archStripeCanvas() {
   const n = 46;
   for (let i = 0; i < n; i++) {
     const a0 = Math.PI + i / n * Math.PI, a1 = Math.PI + (i + 1) / n * Math.PI;
-    g.fillStyle = i % 2 ? '#8e2a1f' : '#efe2c6';
+    g.fillStyle = i % 2 ? '#7d5040' : '#cdbfa4';
     g.beginPath(); g.moveTo(S / 2, S); g.arc(S / 2, S, S * 1.2, a0, a1); g.closePath(); g.fill();
   }
   return c;
@@ -384,5 +398,62 @@ export function latticeCanvas() {
   g.fillStyle = '#c9a14f'; g.fillRect(0, 0, S, S);
   g.globalCompositeOperation = 'destination-out';
   for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) star8(g, x * 64 + 32, y * 64 + 32, 22, '#000', null);
+  return c;
+}
+
+
+// ---------- realism helpers ----------
+// Convert a height canvas (bright = high) into a tangent-space normal map canvas.
+export function heightToNormal(src, strength = 2) {
+  const w = src.width, h = src.height;
+  const sd = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const c = canvas(w, h), g = c.getContext('2d'), img = g.createImageData(w, h), d = img.data;
+  const H = (x, y) => sd[((((y + h) % h) * w + ((x + w) % w)) * 4)] / 255;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+    const l = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+    d[i] = (-dx / l * 0.5 + 0.5) * 255; d[i + 1] = (dy / l * 0.5 + 0.5) * 255; d[i + 2] = (1 / l * 0.5 + 0.5) * 255; d[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+
+// Wrinkled hide (elephant / ox) as a height field.
+export function hideHeight() {
+  return paint(512, 512, (u, v, o) => {
+    const n = fbm(u * 16, v * 16, 16, 4);
+    const r = Math.pow(1 - Math.abs(n * 2 - 1), 4);
+    const f = fbm(u * 64, v * 64, 64, 2);
+    o[0] = o[1] = o[2] = (r * 0.75 + f * 0.25) * 255;
+  });
+}
+
+// Carved wooden window screen (opaque wood, transparent piercings) — casts patterned sunlight.
+export function windowLatticeCanvas() {
+  const W = 256, H = 512;
+  const c = canvas(W, H), g = c.getContext('2d');
+  const path = () => {
+    g.beginPath(); g.moveTo(0, H); g.lineTo(0, 190);
+    g.quadraticCurveTo(4, 60, W / 2, 0); g.quadraticCurveTo(W - 4, 60, W, 190);
+    g.lineTo(W, H); g.closePath();
+  };
+  g.save(); path(); g.clip();
+  g.drawImage(woodCanvas(), 0, 0, W, H);
+  g.fillStyle = 'rgba(40,24,12,.35)'; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'destination-out';
+  for (let y = 0; y < 9; y++) for (let x = 0; x < 5; x++) {
+    const cx = x * 64 + (y % 2 ? 32 : 0), cy = 40 + y * 56;
+    star8(g, cx, cy, 22, '#000', null);
+    poly(g, cx + 32, cy + 28, 8, 4, 0, '#000', null);
+  }
+  g.restore();
+  return c;
+}
+
+export function skyCanvas() {
+  const c = canvas(64, 256), g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, '#cfe2f2'); grd.addColorStop(0.55, '#fff1d6'); grd.addColorStop(1, '#f2d3a0');
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 256);
   return c;
 }

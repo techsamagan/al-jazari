@@ -6,6 +6,7 @@ import {
   stretch, streamMesh, figure, bake, shadows, seg, lerp,
 } from './parts.js';
 import { makePlaque } from './plaques.js';
+import { model } from './assets.js';
 import { INFO } from './info.js';
 
 const TAU = Math.PI * 2;
@@ -29,36 +30,49 @@ function archMat(span) {
 
 function pedestal(P, r = 2.2) {
   octo(r, 0.45, M.marble, P, 0, 0.225, 0);
-  octo(r + 0.03, 0.04, M.gold, P, 0, 0.45, 0);
+  octo(r + 0.03, 0.03, M.brass, P, 0, 0.45, 0);
   octo(r + 0.1, 0.1, M.darkStone, P, 0, 0.05, 0);
+  // brass stanchions with a sagging velvet rope across the visitor side
+  const R = r + 0.45, angs = [-1.05, -0.35, 0.35, 1.05];
+  const tops = angs.map((a) => {
+    const x = Math.sin(a) * R, z = Math.cos(a) * R;
+    cyl(0.16, 0.18, 0.04, M.brass, P, x, 0.02, z, 24);
+    cyl(0.022, 0.022, 0.92, M.brass, P, x, 0.48, z, 12);
+    sph(0.045, M.brass, P, x, 0.96, z, 16);
+    return V(x, 0.9, z);
+  });
+  for (let i = 0; i < tops.length - 1; i++) {
+    const a = tops[i], b = tops[i + 1], m = a.clone().lerp(b, 0.5); m.y -= 0.16;
+    tube([a, a.clone().lerp(m, 0.55).setY(m.y + 0.04), m, b.clone().lerp(m, 0.55).setY(m.y + 0.04), b], 0.018, M.cloth, P, 24, 8);
+  }
 }
 
 // =====================================================================================
 // 1. Elephant clock
 // =====================================================================================
-function elephantClock(ctx, S, D, pos) {
-  const E = M.elephant;
-  for (const [x, z] of [[-0.42, 0.62], [0.42, 0.62], [-0.42, -0.62], [0.42, -0.62]]) {
-    cyl(0.19, 0.23, 1.15, E, S, x, 0.575, z, 18);
-    cyl(0.25, 0.25, 0.07, M.gold, S, x, 0.1, z);
-    cyl(0.236, 0.236, 0.05, M.gold, S, x, 0.24, z);
-  }
-  sph(1, E, S, 0, 1.52, 0, 36).scale.set(0.8, 0.64, 1.15);
-  sph(0.5, E, S, 0, 1.82, 1.12, 30).scale.set(0.95, 1.05, 0.9);
-  tube([V(0, 1.62, 1.46), V(0, 1.3, 1.72), V(0, 0.9, 1.8), V(0, 0.55, 1.72), V(0, 0.38, 1.56), V(0, 0.42, 1.42)], 0.1, E, S, 48, 14);
-  for (const s of [-1, 1]) {
-    const ear = mesh(new THREE.CircleGeometry(0.5, 28), M.elephantDS, S, s * 0.44, 1.86, 0.9);
-    ear.rotation.y = s * 1.2; ear.scale.set(0.85, 1.1, 1);
-    const tusk = mesh(new THREE.ConeGeometry(0.055, 0.6, 12), M.ivory, S, s * 0.2, 1.45, 1.55); tusk.rotation.x = 1.2;
-    sph(0.035, M.black, S, s * 0.3, 1.95, 1.43, 10);
-  }
-  tube([V(0, 1.6, -1.12), V(0, 1.3, -1.26), V(0, 0.95, -1.2)], 0.035, E, S, 12, 6);
+function elephantClock(ctx, S0, D0, pos) {
+  // A carved-wood elephant (Poly Haven scan) carries the clockwork howdah. Its back height is
+  // measured with a ray so the howdah sits on it whatever the model's proportions.
+  const ele = model('carved_wooden_elephant', 2.55);
+  ele.rotation.y = Math.PI / 2; // the model's head points down -x
+  S0.add(ele);
+  S0.updateMatrixWorld(true);
+  const rc = new THREE.Raycaster();
+  const heightAt = (z) => {
+    rc.set(S0.localToWorld(V(0, 10, z)), V(0, -1, 0));
+    const h = rc.intersectObject(ele, true)[0];
+    return h ? S0.worldToLocal(h.point.clone()).y : 2.2;
+  };
+  const backY = heightAt(-0.1), neckY = heightAt(0.85);
+  const dy = backY - 2.15;
+  const S = new THREE.Group(); S.position.y = dy; S0.add(S);
+  const D = new THREE.Group(); D.position.y = dy; D0.add(D);
   // caparison
-  box(1.34, 0.05, 1.6, M.red, S, 0, 2.17, -0.05);
+  box(1.2, 0.04, 1.5, M.cloth, S, 0, 2.17, -0.05);
   for (const s of [-1, 1]) {
-    box(0.04, 0.42, 1.45, M.red, S, s * 0.82, 1.97, -0.05);
-    box(0.05, 0.05, 1.47, M.gold, S, s * 0.83, 1.76, -0.05);
-    for (let k = 0; k < 9; k++) sph(0.025, M.gold, S, s * 0.83, 1.71, -0.7 + k * 0.163, 6);
+    box(0.03, 0.5, 1.4, M.cloth, S, s * 0.6, 1.93, -0.05).rotation.z = s * 0.12;
+    box(0.04, 0.04, 1.42, M.gold, S, s * 0.63, 1.68, -0.05);
+    for (let k = 0; k < 9; k++) sph(0.022, M.gold, S, s * 0.63, 1.64, -0.68 + k * 0.158, 8);
   }
   // howdah platform and pavilion
   box(1.3, 0.1, 1.5, M.darkWood, S, 0, 2.24, -0.05);
@@ -81,7 +95,7 @@ function elephantClock(ctx, S, D, pos) {
     const bk = mesh(new THREE.ConeGeometry(0.014, 0.05, 6), M.saffron, f, 0, 0.12, 0.12); bk.rotation.x = Math.PI / 2 + 0.4;
   }
   // vases that catch the balls
-  for (const s of [-1, 1]) lathe([[0, 0], [0.1, 0], [0.14, 0.1], [0.1, 0.25], [0.06, 0.32], [0.09, 0.38]], M.brass, S, s * 1.65, 0, -0.25, 20);
+  for (const s of [-1, 1]) { const v = model('brass_vase_03', 0.42); v.position.set(s * 1.65, 0, -0.25); S0.add(v); }
 
   // ---- moving parts ----
   const phoenix = new THREE.Group(); phoenix.position.set(0, 4.62, -0.25); D.add(phoenix);
@@ -102,7 +116,7 @@ function elephantClock(ctx, S, D, pos) {
   }
 
   const mahout = figure({ robe: M.lapis, turban: M.white, scale: 0.62, seated: true });
-  mahout.group.position.set(0, 2.2, 0.95); D.add(mahout.group);
+  mahout.group.position.set(0, neckY - dy - 0.02, 0.85); D.add(mahout.group);
   const hammer = mahout.hand(mahout.armR);
   cyl(0.01, 0.01, 0.18, M.darkWood, hammer, 0, -0.06, 0.04, 6).rotation.x = Math.PI / 2;
   box(0.04, 0.05, 0.08, M.gold, hammer, 0, -0.06, 0.14);
@@ -113,7 +127,7 @@ function elephantClock(ctx, S, D, pos) {
   cyl(0.005, 0.005, 0.1, M.black, scribe.hand(scribe.armR), 0, -0.03, 0.02, 4);
 
   const ball = sph(0.045, M.gold, D, 0, -10, 0, 12); ball.visible = false;
-  const hit = box(2.2, 4.8, 3.6, M.hit, D, 0, 2.4, 0);
+  const hit = box(2.2, 4.8, 3.6, M.hit, D0, 0, 2.4, 0);
 
   let start = 0, lastT = 0, cyc = -1, fired = {};
   const trigger = () => { start = lastT; cyc = -1; };
@@ -140,7 +154,7 @@ function elephantClock(ctx, S, D, pos) {
       } else {
         const k = (p - 0.3) / 0.08;
         toLocal(sp, _w2.set(s * 0.24, 1.02, 0), D, _w);
-        ball.position.set(lerp(_w.x, s * 1.65, k), lerp(_w.y, 0.4, k * k), -0.25);
+        ball.position.set(lerp(_w.x, s * 1.65, k), lerp(_w.y, 0.42 - dy, k * k), -0.25);
       }
       if (p > 0.05 && !fired.a) { fired.a = 1; ctx.sound.clack(pos, 0.5); ctx.sound.flute(pos, 1180, 0.12, 0.2); ctx.sound.flute(pos, 1400, 0.1, 0.2, 0.15); }
       if (p > 0.38 && !fired.b) { fired.b = 1; ctx.sound.bell(pos, 660, 0.7); }
@@ -177,7 +191,7 @@ function musicalBoat(ctx, S, D, pos) {
   box(0.66, 0.03, 1.5, M.wood, boat, 0, -0.04, 0);
   for (const s of [-1, 1]) tube([V(0, 0, s * 0.95), V(0, 0.15, s * 1.1), V(0, 0.38, s * 1.12), V(0, 0.48, s * 1.02)], 0.03, M.gold, boat, 16, 8);
   for (const sx of [-0.28, 0.28]) for (const sz of [-0.6, 0.6]) cyl(0.012, 0.012, 0.66, M.gold, boat, sx, 0.29, sz, 6);
-  box(0.66, 0.025, 1.3, M.red, boat, 0, 0.62, 0);
+  box(0.66, 0.025, 1.3, M.cloth, boat, 0, 0.62, 0);
   box(0.68, 0.05, 1.32, M.gold, boat, 0, 0.6, 0);
   mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, TAU, 0, Math.PI / 2), M.gold, boat, 0, 0.63, 0);
 
@@ -570,25 +584,8 @@ function saqiya(ctx, S, D, pos) {
   const RO = 1.1;
   box(RO, 0.06, 0.06, M.darkWood, shaft, RO / 2, 0.72, 0);
   const ox = new THREE.Group(); ox.position.set(RO, 0, 0); ox.rotation.y = Math.PI; shaft.add(ox);
-  sph(1, M.ox, ox, 0, 0.55, 0, 24).scale.set(0.2, 0.22, 0.42);
-  sph(0.12, M.ox, ox, 0, 0.72, 0.18, 14).scale.set(1, 0.7, 1.2);
-  const legs = [];
-  for (const [x, z] of [[-0.11, 0.26], [0.11, 0.26], [-0.11, -0.28], [0.11, -0.28]]) {
-    const l = new THREE.Group(); l.position.set(x, 0.48, z); ox.add(l);
-    cyl(0.04, 0.032, 0.46, M.ox, l, 0, -0.23, 0, 8);
-    cyl(0.036, 0.036, 0.04, M.black, l, 0, -0.46, 0, 8);
-    legs.push(l);
-  }
-  const head = new THREE.Group(); head.position.set(0, 0.62, 0.44); ox.add(head);
-  sph(0.11, M.ox, head, 0, 0, 0.06, 14).scale.set(0.85, 0.9, 1.3);
-  sph(0.07, M.black, head, 0, -0.04, 0.2, 10).scale.set(1, 0.8, 0.8);
-  for (const s of [-1, 1]) {
-    tube([V(s * 0.07, 0.07, 0.02), V(s * 0.18, 0.1, 0), V(s * 0.2, 0.2, 0.04)], 0.015, M.ivory, head, 8, 5);
-    sph(0.014, M.black, head, s * 0.07, 0.03, 0.15, 6);
-  }
-  box(0.36, 0.05, 0.06, M.darkWood, ox, 0, 0.74, 0.32);
-  tube([V(0, 0.6, -0.42), V(0, 0.45, -0.48), V(0, 0.3, -0.46)], 0.015, M.ox, ox, 8, 5);
-  box(0.42, 0.04, 0.5, M.red, ox, 0, 0.77, -0.02);
+  const horse = model('horse_statue_01', 1.05); horse.rotation.y = Math.PI / 2; ox.add(horse);
+  box(0.36, 0.05, 0.06, M.darkWood, ox, 0, 0.74, 0.0);
   // pots on the chain
   const potProf = [[0, 0], [0.04, 0], [0.06, 0.05], [0.055, 0.1], [0.035, 0.13], [0.04, 0.15]];
   const pots = [];
@@ -617,8 +614,8 @@ function saqiya(ctx, S, D, pos) {
   ctx.waterSpots.push(pos);
 
   let psi = 0, w = 0.35, boostUntil = -1, lastT = 0, step = 0;
-  const trigger = () => { boostUntil = lastT + 6; ctx.toast('The ox quickens its pace'); ctx.sound.bell(pos, 392, 0.5); };
-  ctx.addInteractable(hit, 'Saqiya — urge the ox on', trigger);
+  const trigger = () => { boostUntil = lastT + 6; ctx.toast('The water wheel below speeds up'); ctx.sound.bell(pos, 392, 0.5); };
+  ctx.addInteractable(hit, 'Saqiya — speed up the hidden water wheel', trigger);
   return {
     trigger,
     update(t, dt) {
@@ -631,9 +628,6 @@ function saqiya(ctx, S, D, pos) {
       const chainS = vang * R;
       pots.forEach((g, i) => place(chainS + i * Lp / pots.length, g));
       const gait = psi * 18;
-      legs.forEach((l, i) => { l.rotation.x = Math.sin(gait + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.35; });
-      head.rotation.x = Math.sin(gait * 2) * 0.04;
-      ox.position.y = Math.abs(Math.sin(gait)) * 0.015;
       const st = Math.floor(gait / Math.PI);
       if (st !== step) { step = st; ctx.sound.clack(pos, 0.12); }
     },
@@ -694,7 +688,7 @@ function castleClock(ctx, S, D, pos) {
   const falcons = [-1, 1].map((s) => {
     box(0.34, 0.05, 0.4, M.darkWood, S, s * 2.75, 3.68, 0.25);
     box(0.34, 0.05, 0.4, M.darkWood, S, s * 2.75, 2.6, 0.25);
-    lathe([[0, 0], [0.09, 0], [0.13, 0.1], [0.09, 0.24], [0.06, 0.3], [0.08, 0.34]], M.brass, S, s * 2.75, 2.62, 0.3, 18);
+    { const v = model('brass_vase_03', 0.36); v.position.set(s * 2.75, 2.62, 0.3); S.add(v); }
     const f = new THREE.Group(); f.position.set(s * 2.75, 3.7, 0.25); D.add(f);
     sph(0.11, M.bronze, f, 0, 0.12, 0, 14).scale.set(0.8, 1, 1.2);
     sph(0.07, M.bronze, f, 0, 0.26, 0.08, 12);
@@ -778,13 +772,13 @@ export function buildExhibits(ctx) {
     { key: 'saqiya', fn: saqiya, x: 5.5, z: -30, rot: -L },
     { key: 'castle', fn: castleClock, x: 0, z: -46.8, rot: 0, noPed: true },
   ];
-  const items = [], colliders = [], plaques = [];
+  const items = [], colliders = [], plaques = [], spots = [];
   const target = new THREE.Object3D();
   for (const d of defs) {
     const info = INFO[d.key];
     const root = new THREE.Group(); root.position.set(d.x, 0, d.z); root.rotation.y = d.rot; ctx.scene.add(root);
     const h = d.noPed ? 0 : 0.45;
-    if (!d.noPed) { const P = new THREE.Group(); root.add(P); pedestal(P); bake(P); colliders.push({ x: d.x, z: d.z, r: 2.25 }); }
+    if (!d.noPed) { const P = new THREE.Group(); root.add(P); pedestal(P); bake(P); colliders.push({ x: d.x, z: d.z, r: 2.7 }); }
     const S = new THREE.Group(), D = new THREE.Group();
     S.position.y = D.position.y = h;
     S.scale.setScalar(d.scale || 1); D.scale.setScalar(d.scale || 1);
@@ -794,11 +788,23 @@ export function buildExhibits(ctx) {
     const ex = d.fn(ctx, S, D, pos);
     bake(S); shadows(D);
 
-    const spot = new THREE.SpotLight(0xffe2b8, d.noPed ? 130 : 70, 18, d.noPed ? 0.55 : 0.42, 0.75, 2);
-    spot.position.set(d.noPed ? 0 : d.x * 0.55, 9.4, d.noPed ? -40 : d.z + 2);
-    const tg = target.clone(); tg.position.set(d.x, d.noPed ? 3.2 : 1.4, d.z);
+    const spot = new THREE.SpotLight(0xffe0b4, d.noPed ? 260 : 150, 22, d.noPed ? 0.5 : 0.36, 0.6, 2);
+    spot.position.set(d.noPed ? 0 : d.x * 0.45, 9.55, d.noPed ? -39 : d.z + 3);
+    const tg = target.clone(); tg.position.set(d.x, d.noPed ? 3.0 : 1.5, d.z);
     spot.target = tg;
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02;
+    spot.shadow.camera.near = 2; spot.shadow.camera.far = 22;
     ctx.scene.add(spot, tg);
+    spots.push(spot);
+    // the fixture the light comes from: a black can on a short stem, aimed at the exhibit
+    const fx = new THREE.Group(); fx.position.copy(spot.position); ctx.scene.add(fx);
+    cyl(0.015, 0.015, 0.3, M.iron, fx, 0, 0.2, 0, 8);
+    const can = cyl(0.09, 0.075, 0.26, M.black, fx, 0, 0, 0, 20);
+    can.quaternion.setFromUnitVectors(V(0, 1, 0), spot.position.clone().sub(tg.position).normalize());
+    const lens = mesh(new THREE.CircleGeometry(0.07, 20), new THREE.MeshBasicMaterial({ color: 0xfff1d8 }), can, 0, -0.131, 0);
+    lens.rotation.x = Math.PI / 2;
 
     const side = Math.sign(d.x);
     const pl = d.noPed
@@ -814,7 +820,7 @@ export function buildExhibits(ctx) {
     colliders.push({ x, z: 3.6, r: 0.45 });
   }
   return {
-    items, colliders,
+    items, colliders, spots,
     update(t, dt) {
       for (const it of items) it.update(t, dt);
       for (const p of plaques) p.update(t);
