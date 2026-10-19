@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 const _m = new THREE.Matrix4(), _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _center = new THREE.Vector2(0, 0), _tap = new THREE.Vector2(), _hits = [];  // reused every frame: no garbage, no GC pauses
 const clamp = THREE.MathUtils.clamp;
 
 export class Controls {
@@ -39,7 +40,7 @@ export class Controls {
       if (!this.enabled || this.isTouch) return;
       if (this.locked) { this.look(e.movementX * 0.0022, e.movementY * 0.0022); return; }
       if (e.buttons === 1) { this.look(e.movementX * 0.0022, e.movementY * 0.0022); this.dragged = true; }
-      this.mouse = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+      (this.mouse ||= new THREE.Vector2()).set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     });
     this.dom.addEventListener('mousedown', () => { this.dragged = false; });
     this.dom.addEventListener('click', () => {
@@ -98,7 +99,7 @@ export class Controls {
     this.dom.addEventListener('touchcancel', end);
   }
   tapSelect(x, y) {
-    this.raycaster.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
+    this.raycaster.setFromCamera(_tap.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), this.camera);
     const hit = this.raycaster.intersectObjects(this.interactables, false)[0];
     if (hit && hit.distance < 9) this.select(hit.object);
   }
@@ -158,10 +159,12 @@ export class Controls {
       this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(_m);
       s.hit = null; s.floorPoint = null;
       let len = 6;
-      const hit = this.raycaster.intersectObjects(this.interactables, false)[0];
+      _hits.length = 0;
+      const hit = this.raycaster.intersectObjects(this.interactables, false, _hits)[0];
       if (hit && hit.distance < 10) { s.hit = hit.object; len = hit.distance; hovered = hovered || hit.object; }
       else {
-        const fh = this.raycaster.intersectObject(this.floor, false)[0];
+        _hits.length = 0;
+        const fh = this.raycaster.intersectObject(this.floor, false, _hits)[0];
         if (fh && fh.distance < 16) { s.floorPoint = fh.point.clone(); len = fh.distance; if (s.selecting) marker = s.floorPoint; }
       }
       s.line.scale.z = len;
@@ -225,9 +228,11 @@ export class Controls {
     const moving = this.vel.length();
     this.camera.position.y = 1.6 + Math.sin(performance.now() * 0.009) * 0.012 * Math.min(1, moving / 2);
     this.constrain();
-    if (!this.isTouch) {
-      this.raycaster.setFromCamera(this.locked || !this.mouse ? new THREE.Vector2(0, 0) : this.mouse, this.camera);
-      const hit = this.raycaster.intersectObjects(this.interactables, false)[0];
+    // hover test every other frame is plenty for a cursor and halves the raycasting work
+    if (!this.isTouch && (this._frame = (this._frame | 0) + 1) % 2 === 0) {
+      this.raycaster.setFromCamera(this.locked || !this.mouse ? _center : this.mouse, this.camera);
+      _hits.length = 0;
+      const hit = this.raycaster.intersectObjects(this.interactables, false, _hits)[0];
       this.hovered = hit && hit.distance < 9 ? hit.object : null;
     }
   }

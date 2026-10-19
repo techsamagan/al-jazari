@@ -36,12 +36,22 @@ let post = null;
 // high: full effects · medium: no ambient occlusion · low: no post-processing, static spot shadows off.
 // The museum starts high on desktop (low on phones) and steps down by itself if the frame rate drops.
 const TIERS = {
-  high: { pr: 1.5, post: { ao: true, msaa: 4 }, spotShadows: true, sunEvery: 3 },
-  medium: { pr: 1.25, post: { ao: false, msaa: 2 }, spotShadows: true, sunEvery: 5 },
-  low: { pr: 1.0, post: null, spotShadows: false, sunEvery: 10 },
+  high: { pr: 1.5, post: { ao: true, msaa: 4 }, spotShadows: true, sunEvery: 20, sunMap: 4096 },
+  medium: { pr: 1.25, post: { ao: false, msaa: 2 }, spotShadows: true, sunEvery: 30, sunMap: 2048 },
+  low: { pr: 1.0, post: null, spotShadows: false, sunEvery: 0, sunMap: 2048 },
 };
 const ORDER = ['high', 'medium', 'low'];
-let tier = params.get('q') || (params.get('fx') === '0' || isTouch ? 'low' : 'high');
+function guessTier() {
+  if (isTouch) return 'low';
+  try {
+    const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    if (/Intel|SwiftShader|llvmpipe|Mali|Adreno/i.test(gpu)) return 'low';
+    if (/Apple M\d(?! (Pro|Max|Ultra))/.test(gpu)) return 'medium'; // base M1/M2/M3: smooth without AO
+  } catch (e) { /* unknown GPU: assume capable */ }
+  return 'high';
+}
+let tier = params.get('q') || (params.get('fx') === '0' ? 'low' : guessTier());
 if (!TIERS[tier]) tier = 'high';
 let autoQuality = !params.get('q');
 
@@ -53,8 +63,13 @@ function applyTier(name) {
   if (post) { post.dispose(); post = null; }
   if (T.post) post = createPost(renderer, scene, camera, T.post);
   if (exhibits) for (const l of exhibits.spots) { l.castShadow = T.spotShadows; l.shadow.needsUpdate = true; }
-  if (hall) hall.sun.shadow.needsUpdate = true;
+  if (hall) {
+    const sh = hall.sun.shadow;
+    if (sh.mapSize.x !== T.sunMap) { sh.mapSize.set(T.sunMap, T.sunMap); if (sh.map) { sh.map.dispose(); sh.map = null; } }
+    sh.needsUpdate = true;
+  }
   if (!renderer.xr.isPresenting) renderer.xr.setFramebufferScaleFactor(name === 'low' ? 0.85 : 1);
+  if (exhibits) warmUp(); // shadow on/off changes shader variants: compile them now, not mid-walk
 }
 
 let statsEl = null;
@@ -92,14 +107,35 @@ function monitor(rawDt) {
 // spotlights only near the visitor, one per frame in turn. Far exhibits keep their last shadow.
 let frameN = 0;
 const _head = new THREE.Vector3();
+let spotTurn = 0;
 function scheduleShadows() {
   frameN++;
   const T = TIERS[tier];
-  if (frameN % T.sunEvery === 0) hall.sun.shadow.needsUpdate = true;
+  if (T.sunEvery && frameN % T.sunEvery === 0) hall.sun.shadow.needsUpdate = true;
   if (!T.spotShadows) return;
   camera.getWorldPosition(_head);
-  const near = exhibits.spots.filter((s) => Math.hypot(s.userData.target.x - _head.x, s.userData.target.z - _head.z) < 12);
-  if (near.length && frameN % 2 === 0) near[(frameN >> 1) % near.length].shadow.needsUpdate = true;
+  const spots = exhibits.spots;
+  for (let n = 0; n < spots.length; n++) {         // next nearby spotlight in turn, exactly one per frame
+    spotTurn = (spotTurn + 1) % spots.length;
+    const t = spots[spotTurn].userData.target;
+    if (Math.hypot(t.x - _head.x, t.z - _head.z) < 12) { spots[spotTurn].shadow.needsUpdate = true; break; }
+  }
+}
+
+// Compile every shader and upload every texture up front, including things that are hidden
+// until a machine runs (water streams, falling balls…), so nothing stalls the first time it appears.
+function warmUp() {
+  const hidden = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+  renderer.compile(scene, camera);
+  const seen = new Set();
+  scene.traverse((o) => {
+    if (!o.material) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      for (const v of Object.values(m)) if (v && v.isTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); }
+    }
+  });
+  for (const o of hidden) o.visible = false;
 }
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 160);
@@ -161,7 +197,7 @@ async function init() {
     m.envMapIntensity = (m.envMapIntensity !== 1 ? m.envMapIntensity : 1) * (m.metalness > 0.5 ? 0.7 : 0.32);
   });
   applyTier(tier);
-  renderer.compile(scene, camera);
+  warmUp();
   btn.disabled = false;
   btn.textContent = 'Enter the Museum';
   btn.addEventListener('click', start);
@@ -177,7 +213,6 @@ async function init() {
     controls.enabled = true; started = true;
     const wake = () => { sound.start(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
     addEventListener('pointerdown', wake); addEventListener('keydown', wake);
-    setTimeout(() => console.log('stats', tier, 'calls', renderer.info.render.calls, 'tris', renderer.info.render.triangles), 3000);
   }
 }
 
@@ -220,7 +255,7 @@ addEventListener('resize', () => {
 // ---------- loop ----------
 const clock = new THREE.Clock();
 const head = new THREE.Vector3();
-let lastLabel = '';
+let lastLabel = '', lastCursor = '';
 function loop() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
   renderer.info.reset();
@@ -243,7 +278,8 @@ function loop() {
     if (g) g.emissiveIntensity = o === hov ? 2.5 : g.userData.pulse ? 0.6 + Math.sin(t * 2.5) * 0.25 : 0;
   }
   $('reticle').classList.toggle('active', !!hov);
-  if (!isTouch) renderer.domElement.style.cursor = hov && !controls.locked ? 'pointer' : '';
+  const cur = !isTouch && hov && !controls.locked ? 'pointer' : '';
+  if (cur !== lastCursor) { lastCursor = cur; renderer.domElement.style.cursor = cur; }
 
   let label = '';
   if (performance.now() < toastUntil) label = toastText;
@@ -258,9 +294,7 @@ function loop() {
   else renderer.render(scene, camera);
 }
 
-if (params.get("count")) import("./_count.js");
 init().catch((e) => {
-  console.error(e);
   const btn = $('enter');
   btn.textContent = 'Could not load the collection — check that assets/ exists (python3 tools/fetch_assets.py) and reload';
   btn.style.fontSize = '13px';

@@ -158,13 +158,13 @@ export function buildHall(scene) {
   // ---------- hanging brass lanterns (real light sources) ----------
   // Emissive core + soft halo instead of point lights: every extra light costs every pixel.
   const lanternGlow = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffa24a, emissiveIntensity: 6 });
-  const haloMat = new THREE.SpriteMaterial({ map: TX.tex(TX.glowCanvas(), { wrap: false }), color: 0xffa860, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  const haloMat = new THREE.SpriteMaterial({ map: TX.tex(TX.glowCanvas(), { wrap: false }), color: 0xffa860, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false });
   for (const z of [3, -9, -21, -33]) {
     const g = new THREE.Group(); g.position.set(0, 7.0, z); B.add(g);
     cyl(0.008, 0.008, H - 7.0, M.iron, g, 0, (H - 7.0) / 2, 0, 6);
     const lan = model('brass_diya_lantern', 0.9); lan.position.y = -0.9; g.add(lan);
     sph(0.06, lanternGlow, g, 0, -0.55, 0, 12);
-    const halo = new THREE.Sprite(haloMat); halo.position.y = -0.55; halo.scale.setScalar(1.3); g.add(halo);
+    const halo = new THREE.Sprite(haloMat); halo.position.y = -0.55; halo.scale.setScalar(0.9); g.add(halo);
   }
 
   // ---------- museum benches & display vases ----------
