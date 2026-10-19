@@ -1,7 +1,7 @@
 // Lectern-style information plaques with an optional glowing "activate" gem.
 import * as THREE from 'three';
 import * as TX from './textures.js';
-import { M, mesh, box, cyl } from './parts.js';
+import { M, mesh, box, cyl, bake } from './parts.js';
 
 function wrap(g, text, maxW) {
   const words = text.split(' '), lines = [];
@@ -79,11 +79,13 @@ export function makePlaque(ctx, info, { x, z, rotY = 0, onActivate = null, activ
     cyl(0.075, 0.08, 0.05, M.bronze, head, 0, 0, 0, 28);
     gemMat = new THREE.MeshStandardMaterial({ color: 0x0c2a28, emissive: 0x3fd8c8, emissiveIntensity: 1, roughness: 0.3 });
     gemMat.userData.pulse = true;
-    mesh(new THREE.TorusGeometry(0.058, 0.008, 8, 32), gemMat, head, 0, 0.026, 0).rotation.x = Math.PI / 2;
+    const ring = mesh(new THREE.TorusGeometry(0.058, 0.008, 8, 32), gemMat, head, 0, 0.026, 0);
+    ring.rotation.x = Math.PI / 2; ring.userData.keep = true;
     gem = cyl(0.045, 0.048, 0.03, M.brass, head, 0, 0.035, 0, 28);
     const hit = mesh(new THREE.SphereGeometry(0.17, 8, 6), M.hit, grp, 0.62, 0.95, 0.12);
     ctx.addInteractable(hit, activateLabel, onActivate, gemMat);
   }
+  bake(grp); // stand, frame, panel and button become a handful of draws
   return {
     group: grp,
     update() {},

@@ -61,15 +61,17 @@ export function buildHall(scene) {
   }
 
   // carved lattice screens (cast patterned sunlight) + bright sky beyond
+  const B = new THREE.Group(); root.add(B); // static props, baked at the end
+  const SKY = new THREE.Group(); root.add(SKY); // must never cast shadows (it sits in the sun's path)
   const latticeMat = new THREE.MeshStandardMaterial({ map: TX.tex(TX.windowLatticeCanvas(), { wrap: false }), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8 });
   const skyMat = new THREE.MeshBasicMaterial({ map: TX.tex(TX.skyCanvas(), { wrap: false }), fog: false });
   skyMat.color.setScalar(4.5);
   const winH = spring + Math.sqrt((winHalf + 0.35) ** 2 - 0.35 ** 2) - sill;
   const glows = [];
   for (const s of [-1, 1]) for (const z of winZ) {
-    const lat = mesh(new THREE.PlaneGeometry(winHalf * 2, winH), latticeMat, root, s * (X + 0.35), sill + winH / 2, z);
+    const lat = mesh(new THREE.PlaneGeometry(winHalf * 2, winH), latticeMat, B, s * (X + 0.35), sill + winH / 2, z);
     lat.rotation.y = -s * Math.PI / 2; lat.castShadow = true;
-    const sky = mesh(new THREE.PlaneGeometry(3, 5), skyMat, root, s * (X + 2.5), sill + winH / 2, z);
+    const sky = mesh(new THREE.PlaneGeometry(3, 5), skyMat, SKY, s * (X + 2.5), sill + winH / 2, z);
     sky.rotation.y = -s * Math.PI / 2;
     box(winHalf * 2 + 0.3, 0.12, wallThick + 0.16, M.marble, S, s * (X + wallThick / 2), sill - 0.06, z).rotation.y = Math.PI / 2;
     glows.push(lat);
@@ -142,39 +144,38 @@ export function buildHall(scene) {
 
   // ---------- volumetric hint: faint shafts along the sun direction ----------
   const shaftMat = new THREE.MeshBasicMaterial({ map: TX.tex(TX.shaftCanvas(), { wrap: false }), color: 0xffdcae, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
-  const shafts = [];
+  const SH = new THREE.Group(); root.add(SH);
   for (const z of winZ) {
     const o = new THREE.Vector3(X + 0.3, sill + winH * 0.45, z), len = 8.5;
     const midP = o.clone().addScaledVector(SUN_DIR, len / 2);
     for (let k = 0; k < 2; k++) {
-      const sh = mesh(new THREE.PlaneGeometry(1.5, len), shaftMat, root, midP.x, midP.y, midP.z);
+      const sh = mesh(new THREE.PlaneGeometry(1.5, len), shaftMat, SH, midP.x, midP.y, midP.z);
       sh.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), SUN_DIR);
-      sh.rotateY(k * Math.PI / 2); sh.renderOrder = 2;
-      shafts.push(sh);
+      sh.rotateY(k * Math.PI / 2);
     }
   }
 
   // ---------- hanging brass lanterns (real light sources) ----------
+  // Emissive core + soft halo instead of point lights: every extra light costs every pixel.
   const lanternGlow = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffa24a, emissiveIntensity: 6 });
-  const lights = [];
+  const haloMat = new THREE.SpriteMaterial({ map: TX.tex(TX.glowCanvas(), { wrap: false }), color: 0xffa860, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
   for (const z of [3, -9, -21, -33]) {
-    const g = new THREE.Group(); g.position.set(0, 7.0, z); root.add(g);
+    const g = new THREE.Group(); g.position.set(0, 7.0, z); B.add(g);
     cyl(0.008, 0.008, H - 7.0, M.iron, g, 0, (H - 7.0) / 2, 0, 6);
     const lan = model('brass_diya_lantern', 0.9); lan.position.y = -0.9; g.add(lan);
     sph(0.06, lanternGlow, g, 0, -0.55, 0, 12);
-    const pl = new THREE.PointLight(0xffa860, 6, 11, 2); pl.position.y = -0.5; g.add(pl);
-    lights.push(pl);
+    const halo = new THREE.Sprite(haloMat); halo.position.y = -0.55; halo.scale.setScalar(1.3); g.add(halo);
   }
 
   // ---------- museum benches & display vases ----------
   const colliders = [];
   for (const z of [-12, -24, -36]) {
-    const b = model('painted_wooden_bench', 0.89); b.position.set(0, 0, z); b.rotation.y = Math.PI / 2; root.add(b);
+    const b = model('painted_wooden_bench', 0.89); b.position.set(0, 0, z); b.rotation.y = Math.PI / 2; B.add(b);
     colliders.push({ x: 0, z, r: 0.75 });
   }
   for (const s of [-1, 1]) for (const z of [-2, -14, -26, -38]) {
     box(0.6, 0.9, 0.6, M.marble, S, s * 9.2, 0.45, z);
-    const v = model('brass_vase_01', 1.0); v.position.set(s * 9.2, 0.9, z); root.add(v);
+    const v = model('brass_vase_03', 0.85); v.position.set(s * 9.2, 0.9, z); B.add(v);
   }
 
   // ---------- entrance doorway ----------
@@ -194,6 +195,9 @@ export function buildHall(scene) {
   const bannerPos = banner.geometry.attributes.position, bannerBase = Float32Array.from(bannerPos.array);
 
   bake(S);
+  bake(B);
+  bake(SKY); SKY.children.forEach((m) => { m.castShadow = false; m.receiveShadow = false; });
+  bake(SH, { transparent: true }); SH.children.forEach((m) => { m.castShadow = m.receiveShadow = false; m.renderOrder = 2; });
 
   // ---------- dust motes ----------
   const N = 500, dpos = new Float32Array(N * 3), seeds = new Float32Array(N);
@@ -217,10 +221,12 @@ export function buildHall(scene) {
   sun.shadow.mapSize.set(4096, 4096);
   Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 26, bottom: -26, near: 1, far: 100 });
   sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.04;
+  sun.shadow.autoUpdate = false; // main.js refreshes it a few times a second
+  sun.shadow.needsUpdate = true;
   scene.add(sun, sun.target);
 
   return {
-    floor, colliders, lights,
+    floor, colliders, sun,
     bounds: { minX: -7.9, maxX: 7.9, minZ: -44.0, maxZ: 8.6 },
     update(t) {
       for (let k = 0; k < N; k++) {
@@ -233,9 +239,7 @@ export function buildHall(scene) {
         bannerPos.array[k * 3 + 2] = bannerBase[k * 3 + 2] + Math.sin(x * 1.3 + t * 0.7) * 0.035 * (1 - (y + 0.94) / 1.9);
       }
       bannerPos.needsUpdate = true;
-      banner.geometry.computeVertexNormals();
       lanternGlow.emissiveIntensity = 6 + Math.sin(t * 7) * 0.3 + Math.sin(t * 13.1) * 0.2;
-      for (const l of lights) l.intensity = 6 + Math.sin(t * 9 + l.position.x) * 0.25;
     },
   };
 }

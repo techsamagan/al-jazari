@@ -4,13 +4,13 @@ import json, os, sys, urllib.request
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets')
 TEX = {  # name: resolution
-    'marble_01': '2k', 'large_sandstone_blocks': '2k', 'dark_wood': '1k', 'medieval_wood': '1k',
-    'fine_grained_wood': '1k', 'quatrefoil_jacquard_fabric': '1k', 'leather_red_02': '1k',
-    'metal_plate': '1k', 'plastered_wall_04': '1k', 'floor_tiles_06': '1k', 'castle_brick_02_white': '1k',
+    'marble_01': '2k', 'large_sandstone_blocks': '1k', 'dark_wood': '1k', 'medieval_wood': '1k',
+    'fine_grained_wood': '1k', 'quatrefoil_jacquard_fabric': '1k',
+    'metal_plate': '1k', 'plastered_wall_04': '1k',
 }
 MAPS = {'diff': 'Diffuse', 'nor': 'nor_gl', 'rough': 'Rough', 'ao': 'AO'}
-MODELS = ['carved_wooden_elephant', 'brass_vase_01', 'brass_vase_03', 'brass_goblets', 'metal_jug',
-          'ceramic_vase_02', 'brass_diya_lantern', 'painted_wooden_bench', 'brass_pot_01', 'horse_statue_01']
+MODELS = ['carved_wooden_elephant', 'brass_vase_03', 'brass_diya_lantern',
+          'painted_wooden_bench', 'horse_statue_01']
 HDRI = ('museum_of_ethnography', '1k')
 
 def get(url, dest):

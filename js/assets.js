@@ -12,15 +12,12 @@ const TEXTURES = {
   dark_wood: ['diff', 'nor', 'rough'],
   medieval_wood: ['diff', 'nor', 'rough'],
   fine_grained_wood: ['diff', 'nor', 'rough'],
-  quatrefoil_jacquard_fabric: ['nor', 'rough'],
-  leather_red_02: ['nor', 'rough'],
+  quatrefoil_jacquard_fabric: ['nor'],
   metal_plate: ['nor', 'rough'],
-  plastered_wall_04: ['diff', 'nor', 'rough'],
-  floor_tiles_06: ['nor', 'rough'],
-  castle_brick_02_white: ['diff', 'nor', 'rough'],
+  plastered_wall_04: ['nor'],
 };
-const MODELS = ['carved_wooden_elephant', 'brass_vase_01', 'brass_vase_03', 'brass_goblets', 'metal_jug',
-  'ceramic_vase_02', 'brass_diya_lantern', 'painted_wooden_bench', 'brass_pot_01', 'horse_statue_01'];
+const MODELS = ['carved_wooden_elephant', 'brass_vase_03', 'brass_diya_lantern',
+  'painted_wooden_bench', 'horse_statue_01'];
 
 // Retry flaky network fetches a couple of times before giving up.
 async function retry(fn, tries = 3) {

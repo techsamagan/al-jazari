@@ -25,17 +25,22 @@ const GradeShader = {
     }`,
 };
 
-export function createPost(renderer, scene, camera) {
+// opts: { ao: bool, msaa: samples } — AO is the most expensive pass, so it runs at half resolution.
+export function createPost(renderer, scene, camera, { ao = true, msaa = 4 } = {}) {
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+  const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: msaa });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
 
-  const gtao = new GTAOPass(scene, camera, size.x, size.y);
-  gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1.25, samples: 16 });
-  gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
-  gtao.blendIntensity = 1.0;
-  composer.addPass(gtao);
+  if (ao) {
+    const gtao = new GTAOPass(scene, camera, size.x / 2, size.y / 2);
+    gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1.25, samples: 8 });
+    gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 8 });
+    gtao.blendIntensity = 1.0;
+    const setSize = gtao.setSize.bind(gtao);
+    gtao.setSize = (w, h) => setSize(Math.ceil(w / 2), Math.ceil(h / 2));
+    composer.addPass(gtao);
+  }
 
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.28, 0.55, 0.95);
   composer.addPass(bloom);
@@ -47,5 +52,6 @@ export function createPost(renderer, scene, camera) {
     composer,
     setSize(w, h) { composer.setSize(w, h); },
     render(dt) { grade.uniforms.time.value += dt; composer.render(dt); },
+    dispose() { composer.dispose(); rt.dispose(); },
   };
 }

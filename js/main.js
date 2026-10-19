@@ -13,8 +13,9 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 
 // ---------- renderer / scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
+renderer.info.autoReset = false; // count every pass of a frame, not just the last one
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.45;
@@ -29,8 +30,77 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0c0907);
 scene.fog = new THREE.Fog(0x14100b, 35, 90);
 const params = new URLSearchParams(location.search);
-const useFx = params.get('fx') !== '0';
 let post = null;
+
+// ---------- quality tiers ----------
+// high: full effects · medium: no ambient occlusion · low: no post-processing, static spot shadows off.
+// The museum starts high on desktop (low on phones) and steps down by itself if the frame rate drops.
+const TIERS = {
+  high: { pr: 1.5, post: { ao: true, msaa: 4 }, spotShadows: true, sunEvery: 3 },
+  medium: { pr: 1.25, post: { ao: false, msaa: 2 }, spotShadows: true, sunEvery: 5 },
+  low: { pr: 1.0, post: null, spotShadows: false, sunEvery: 10 },
+};
+const ORDER = ['high', 'medium', 'low'];
+let tier = params.get('q') || (params.get('fx') === '0' || isTouch ? 'low' : 'high');
+if (!TIERS[tier]) tier = 'high';
+let autoQuality = !params.get('q');
+
+function applyTier(name) {
+  tier = name;
+  const T = TIERS[name];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, T.pr));
+  renderer.setSize(innerWidth, innerHeight);
+  if (post) { post.dispose(); post = null; }
+  if (T.post) post = createPost(renderer, scene, camera, T.post);
+  if (exhibits) for (const l of exhibits.spots) { l.castShadow = T.spotShadows; l.shadow.needsUpdate = true; }
+  if (hall) hall.sun.shadow.needsUpdate = true;
+  if (!renderer.xr.isPresenting) renderer.xr.setFramebufferScaleFactor(name === 'low' ? 0.85 : 1);
+}
+
+let statsEl = null;
+function toggleStats() {
+  if (statsEl) { statsEl.remove(); statsEl = null; return; }
+  statsEl = document.createElement('div');
+  statsEl.style.cssText = 'position:fixed;left:8px;top:8px;z-index:20;font:12px/1.3 ui-monospace,monospace;color:#e8dcc0;background:rgba(0,0,0,.55);padding:5px 8px;border-radius:4px;pointer-events:none';
+  document.body.appendChild(statsEl);
+}
+if (params.get('stats')) toggleStats();
+addEventListener('keydown', (e) => {
+  if (e.code === 'KeyF' && !e.repeat) toggleStats();
+  if (e.code === 'KeyQ' && !e.repeat && exhibits) {
+    autoQuality = false;
+    applyTier(ORDER[(ORDER.indexOf(tier) + 1) % ORDER.length]);
+    ctx.toast(`Quality: ${tier}`);
+  }
+});
+
+const perf = { acc: 0, n: 0, fps: 60, ms: 16.7, settle: 0 };
+function monitor(rawDt) {
+  perf.acc += rawDt; perf.n++;
+  if (perf.acc < 1) return;
+  perf.fps = perf.n / perf.acc; perf.ms = 1000 * perf.acc / perf.n; perf.acc = 0; perf.n = 0;
+  if (autoQuality && started && !renderer.xr.isPresenting && document.visibilityState === 'visible' && ++perf.settle > 3 && perf.fps < 45) {
+    perf.settle = 0;
+    const i = ORDER.indexOf(tier);
+    if (i < ORDER.length - 1) { applyTier(ORDER[i + 1]); ctx.toast(`Quality lowered to ${tier} for smoother motion (Q to change)`); }
+    else if (renderer.getPixelRatio() > 0.75) { renderer.setPixelRatio(Math.max(0.75, renderer.getPixelRatio() - 0.15)); renderer.setSize(innerWidth, innerHeight); }
+  }
+  if (statsEl) statsEl.textContent = `${perf.fps.toFixed(0)} fps · ${perf.ms.toFixed(1)} ms · ${renderer.info.render.calls} draws · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · ${tier} @${renderer.getPixelRatio().toFixed(2)}x`;
+}
+
+// Shadows are refreshed on a schedule instead of every frame: the sun a few times a second,
+// spotlights only near the visitor, one per frame in turn. Far exhibits keep their last shadow.
+let frameN = 0;
+const _head = new THREE.Vector3();
+function scheduleShadows() {
+  frameN++;
+  const T = TIERS[tier];
+  if (frameN % T.sunEvery === 0) hall.sun.shadow.needsUpdate = true;
+  if (!T.spotShadows) return;
+  camera.getWorldPosition(_head);
+  const near = exhibits.spots.filter((s) => Math.hypot(s.userData.target.x - _head.x, s.userData.target.z - _head.z) < 12);
+  if (near.length && frameN % 2 === 0) near[(frameN >> 1) % near.length].shadow.needsUpdate = true;
+}
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 160);
 camera.position.set(0, 1.6, 0);
@@ -90,7 +160,7 @@ async function init() {
     m.userData.envSet = true;
     m.envMapIntensity = (m.envMapIntensity !== 1 ? m.envMapIntensity : 1) * (m.metalness > 0.5 ? 0.7 : 0.32);
   });
-  if (useFx) post = createPost(renderer, scene, camera);
+  applyTier(tier);
   renderer.compile(scene, camera);
   btn.disabled = false;
   btn.textContent = 'Enter the Museum';
@@ -107,7 +177,7 @@ async function init() {
     controls.enabled = true; started = true;
     const wake = () => { sound.start(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
     addEventListener('pointerdown', wake); addEventListener('keydown', wake);
-    setTimeout(() => console.log('stats calls', renderer.info.render.calls, 'tris', renderer.info.render.triangles), 3000);
+    setTimeout(() => console.log('stats', tier, 'calls', renderer.info.render.calls, 'tris', renderer.info.render.triangles), 3000);
   }
 }
 
@@ -152,7 +222,10 @@ const clock = new THREE.Clock();
 const head = new THREE.Vector3();
 let lastLabel = '';
 function loop() {
-  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
+  renderer.info.reset();
+  monitor(raw);
+  if (!renderer.xr.isPresenting) scheduleShadows();
   controls.update(dt);
   hall.update(t, dt);
   exhibits.update(t, dt);
@@ -170,6 +243,7 @@ function loop() {
     if (g) g.emissiveIntensity = o === hov ? 2.5 : g.userData.pulse ? 0.6 + Math.sin(t * 2.5) * 0.25 : 0;
   }
   $('reticle').classList.toggle('active', !!hov);
+  if (!isTouch) renderer.domElement.style.cursor = hov && !controls.locked ? 'pointer' : '';
 
   let label = '';
   if (performance.now() < toastUntil) label = toastText;
@@ -184,6 +258,7 @@ function loop() {
   else renderer.render(scene, camera);
 }
 
+if (params.get("count")) import("./_count.js");
 init().catch((e) => {
   console.error(e);
   const btn = $('enter');

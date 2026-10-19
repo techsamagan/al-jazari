@@ -24,21 +24,30 @@ export class Controls {
 
   // ---------- desktop ----------
   setupDesktop() {
-    addEventListener('keydown', (e) => { this.keys[e.code] = true; });
+    addEventListener('keydown', (e) => {
+      this.keys[e.code] = true;
+      if ((e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') && this.enabled && !e.repeat) this.select(this.hovered);
+    });
     addEventListener('keyup', (e) => { this.keys[e.code] = false; });
     addEventListener('blur', () => { this.keys = {}; });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.dom;
       this.onLockChange && this.onLockChange(this.locked);
     });
+    this.mouse = null; // cursor position (NDC) while the mouse is not captured
     document.addEventListener('mousemove', (e) => {
       if (!this.enabled || this.isTouch) return;
-      if (this.locked || e.buttons === 1) this.look(e.movementX * 0.0022, e.movementY * 0.0022);
+      if (this.locked) { this.look(e.movementX * 0.0022, e.movementY * 0.0022); return; }
+      if (e.buttons === 1) { this.look(e.movementX * 0.0022, e.movementY * 0.0022); this.dragged = true; }
+      this.mouse = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     });
+    this.dom.addEventListener('mousedown', () => { this.dragged = false; });
     this.dom.addEventListener('click', () => {
       if (!this.enabled || this.isTouch || this.renderer.xr.isPresenting) return;
-      if (!this.locked) { this.lock(); return; }
-      this.select(this.hovered);
+      if (this.locked) { this.select(this.hovered); return; }
+      // not captured: a click on a button / peg / machine presses it directly; elsewhere it captures the mouse
+      if (this.hovered) { this.select(this.hovered); return; }
+      if (!this.dragged) this.lock();
     });
   }
   lock() {
@@ -217,7 +226,7 @@ export class Controls {
     this.camera.position.y = 1.6 + Math.sin(performance.now() * 0.009) * 0.012 * Math.min(1, moving / 2);
     this.constrain();
     if (!this.isTouch) {
-      this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+      this.raycaster.setFromCamera(this.locked || !this.mouse ? new THREE.Vector2(0, 0) : this.mouse, this.camera);
       const hit = this.raycaster.intersectObjects(this.interactables, false)[0];
       this.hovered = hit && hit.distance < 9 ? hit.object : null;
     }

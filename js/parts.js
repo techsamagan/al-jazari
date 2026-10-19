@@ -36,7 +36,8 @@ export function initMaterials() {
   M.darkWood = uvm(std({ map: dw.diff, normalMap: dw.nor, roughnessMap: dw.rough, color: 0xcfc2b4 }), 1.2);
 
   // painted wood (automaton figures, small parts)
-  const paint = (color, rough = 0.62) => uvm(std({ color, roughness: rough, normalMap: fw.nor, normalScale: V2(0.35), roughnessMap: fw.rough }), 0.3);
+  const paint = (color, rough = 0.62) => { const m = uvm(std({ color, roughness: rough, normalMap: fw.nor, normalScale: V2(0.35), roughnessMap: fw.rough }), 0.3); m.userData.paint = true; return m; };
+  M.paintVC = paint(0xffffff, 0.58); M.paintVC.vertexColors = true; // merged figures: one material, colours per vertex
   M.ivory = paint(0xd8cbaf, 0.45);
   M.lapis = paint(0x27406c, 0.5);
   M.turq = paint(0x2f6b67);
@@ -215,17 +216,26 @@ export function figure({ robe = M.red, sash = M.gold, turban = M.white, skin = M
     sph(0.027, skin, a, 0, -0.275, 0, 12).scale.set(0.9, 1.1, 0.8);
     arms.push(a);
   }
+  bake(head, { paint: true });
+  for (const a of arms) bake(a, { paint: true });
+  bake(body, { shallow: true, paint: true });
   g.scale.setScalar(scale);
   return { group: g, body, head, armL: arms[0], armR: arms[1], hand: (arm) => { const o = new THREE.Object3D(); o.position.y = -0.29; arm.add(o); return o; } };
 }
 
-// Merge every mesh under `root` into one mesh per material (huge draw-call saving).
-export function bake(root) {
+// Merge meshes under `root` into one mesh per material (huge draw-call saving).
+//   shallow: only meshes not inside a nested Group (those are separately animated parts)
+//   paint:   merge all painted-wood materials into one vertex-coloured material
+//   transparent: also merge transparent meshes (only safe when they never need sorting)
+export function bake(root, { shallow = false, paint = false, transparent = false } = {}) {
   root.updateMatrixWorld(true);
   const inv = root.matrixWorld.clone().invert();
   const buckets = new Map(), remove = [];
+  const nested = (o) => { for (let p = o.parent; p && p !== root; p = p.parent) if (!p.isMesh) return true; return false; };
   root.traverse((o) => {
-    if (!o.isMesh || o.material.transparent || o.userData.keep || Array.isArray(o.material)) return;
+    if (!o.isMesh || o.isInstancedMesh || o.userData.keep || Array.isArray(o.material)) return;
+    if (o.material.visible === false || (o.material.transparent && !transparent)) return;
+    if (shallow && nested(o)) return;
     let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
@@ -233,8 +243,15 @@ export function bake(root) {
     g.clearGroups();
     g.morphAttributes = {};
     g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
-    if (!buckets.has(o.material)) buckets.set(o.material, []);
-    buckets.get(o.material).push(g);
+    let mat = o.material;
+    if (paint && mat.userData.paint) {
+      const n = g.attributes.position.count, col = new Float32Array(n * 3), c = mat.color;
+      for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      mat = M.paintVC;
+    }
+    if (!buckets.has(mat)) buckets.set(mat, []);
+    buckets.get(mat).push(g);
     remove.push(o);
   });
   for (const o of remove) o.parent && o.parent.remove(o);
@@ -243,6 +260,7 @@ export function bake(root) {
     m.castShadow = m.receiveShadow = true;
     root.add(m);
   }
+  return root;
 }
 
 // Only reasonably large moving parts cast shadows; tiny ones would just add draw calls.

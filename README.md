@@ -27,7 +27,7 @@ python3 -m http.server 8000
 ```
 Open http://localhost:8000.
 
-**Desktop:** W A S D to walk · mouse to look · Shift to hurry · click a brass button or a drum peg · Esc releases the mouse.
+**Desktop:** W A S D to walk · mouse to look · Shift to hurry · click a brass button or a drum peg (or aim and press E) · Esc releases the mouse · Q quality · F FPS meter.
 **Phone:** drag on the left side to walk, on the right side to look, and tap buttons or pegs.
 
 Jump straight to a spot: `http://localhost:8000/?cam=x,z,yawDeg,pitchDeg`, for example `?cam=0,-37,0,6` faces the Castle Clock.

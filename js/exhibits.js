@@ -115,6 +115,7 @@ function elephantClock(ctx, S0, D0, pos) {
     serps.push(g);
   }
 
+  bake(phoenix); serps.forEach((g) => bake(g));
   const mahout = figure({ robe: M.lapis, turban: M.white, scale: 0.62, seated: true });
   mahout.group.position.set(0, neckY - dy - 0.02, 0.85); D.add(mahout.group);
   const hammer = mahout.hand(mahout.armR);
@@ -219,24 +220,31 @@ function musicalBoat(ctx, S, D, pos) {
   for (const x of [-0.3, 0.3]) mesh(new THREE.TorusGeometry(0.302, 0.008, 6, 48), M.iron, drum, x, 0, 0).rotation.y = Math.PI / 2;
   const pegGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.07, 10);
   const hitGeo = new THREE.BoxGeometry(0.11, 0.11, 0.1);
-  const tracks = [{ x: -0.3, on: Array(16).fill(false), pegs: [], kind: 'drum' }, { x: 0.3, on: Array(16).fill(false), pegs: [], kind: 'flute' }];
-  const setPeg = (tr, k, v) => {
-    tr.on[k] = v;
-    const p = tr.pegs[k];
-    p.scale.y = v ? 1 : 0.22;
-    p.material.color.set(v ? 0xf0c869 : 0x3a332c);
-    p.material.metalness = v ? 1 : 0.6;
+  const tracks = [{ x: -0.3, on: Array(16).fill(false), kind: 'drum' }, { x: 0.3, on: Array(16).fill(false), kind: 'flute' }];
+  // all 32 pegs are one instanced mesh; colour per instance shows on / off / hovered
+  const pegs = new THREE.InstancedMesh(pegGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.25 }), 32);
+  pegs.castShadow = true; drum.add(pegs);
+  const GOLD = new THREE.Color(0xf0c869), DARK = new THREE.Color(0x3a332c), HOT = new THREE.Color(0x5fe0d0);
+  const pq = new THREE.Quaternion(), pp = new THREE.Vector3(), ps = new THREE.Vector3(), pm = new THREE.Matrix4(), X = new THREE.Vector3(1, 0, 0);
+  const hot = new Array(32).fill(false);
+  const paintPeg = (ti, k) => {
+    const i = ti * 16 + k, on = tracks[ti].on[k], a = k / 16 * TAU;
+    pp.set(tracks[ti].x, Math.cos(a) * 0.33, Math.sin(a) * 0.33); pq.setFromAxisAngle(X, a); ps.set(1, on ? 1 : 0.22, 1);
+    pegs.setMatrixAt(i, pm.compose(pp, pq, ps));
+    pegs.setColorAt(i, hot[i] ? HOT : on ? GOLD : DARK);
+    pegs.instanceMatrix.needsUpdate = true; pegs.instanceColor.needsUpdate = true;
   };
-  for (const tr of tracks) {
+  const setPeg = (tr, k, v) => { tr.on[k] = v; paintPeg(tracks.indexOf(tr), k); };
+  tracks.forEach((tr, ti) => {
     for (let k = 0; k < 16; k++) {
-      const a = k / 16 * TAU;
-      const mat = new THREE.MeshStandardMaterial({ color: 0xf0c869, metalness: 1, roughness: 0.2, emissive: 0x2fd0c0, emissiveIntensity: 0 });
-      const p = mesh(pegGeo, mat, drum, tr.x, Math.cos(a) * 0.33, Math.sin(a) * 0.33); p.rotation.x = a;
-      tr.pegs.push(p);
+      const a = k / 16 * TAU, i = ti * 16 + k;
+      paintPeg(ti, k);
       const h = mesh(hitGeo, M.hit, drum, tr.x, Math.cos(a) * 0.34, Math.sin(a) * 0.34); h.rotation.x = a;
-      ctx.addInteractable(h, `Peg ${k + 1} · ${tr.kind} track — toggle`, () => { setPeg(tr, k, !tr.on[k]); ctx.sound.clack(pos, 0.4); }, mat);
+      // the hover-glow hook main.js drives every frame, mapped onto this peg's instance colour
+      const glow = { userData: {}, set emissiveIntensity(v) { const h2 = v > 1; if (h2 !== hot[i]) { hot[i] = h2; paintPeg(ti, k); } } };
+      ctx.addInteractable(h, `Peg ${k + 1} · ${tr.kind} track — toggle`, () => { setPeg(tr, k, !tr.on[k]); ctx.sound.clack(pos, 0.4); }, glow);
     }
-  }
+  });
   // follower levers riding on the pegs
   const levers = tracks.map((tr) => {
     cyl(0.02, 0.02, 0.4, M.bronze, S, tr.x, 0.98, 1.37, 8);
@@ -246,6 +254,7 @@ function musicalBoat(ctx, S, D, pos) {
     return l;
   });
 
+  bake(drum); bake(boat, { shallow: true }); levers.forEach((l) => bake(l));
   let preset = 0;
   const applyPreset = (i) => {
     preset = i;
@@ -336,16 +345,15 @@ function peacockBasin(ctx, S, D, pos) {
   }
   const tail = new THREE.Group(); tail.position.set(0, 2.1, -1.12); D.add(tail);
   const fGeo = new THREE.PlaneGeometry(0.17, 0.95).translate(0, 0.475, 0);
-  const feathers = [];
-  for (let i = 0; i < 17; i++) {
-    const f = mesh(fGeo, M.feather, tail, 0, 0, -i * 0.003);
-    f.userData.a = (i / 16 - 0.5) * 2.7;
-    feathers.push(f);
-  }
+  const feathers = new THREE.InstancedMesh(fGeo, M.feather, 17);
+  feathers.castShadow = true; tail.add(feathers);
+  const fAng = Array.from({ length: 17 }, (_, i) => (i / 16 - 0.5) * 2.7);
+  const fd = new THREE.Object3D();
   const stream = streamMesh(D);
   const hit = box(1.8, 2.8, 2.0, M.hit, D, 0, 1.4, -0.4);
   ctx.waterSpots.push(pos);
 
+  doors.forEach((d) => bake(d));
   let start = -6, lastT = 0, cyc = -1, fired = {};
   const trigger = () => { start = lastT; cyc = -1; };
   ctx.addInteractable(hit, 'Peacock Basin — wash your hands', trigger);
@@ -358,7 +366,12 @@ function peacockBasin(ctx, S, D, pos) {
       if (n !== cyc) { cyc = n; fired = {}; }
       const fan = p < 0.9 ? seg(p, 0, 0.08) : 1 - seg(p, 0.9, 0.98);
       tail.rotation.x = lerp(-1.25, -0.2, fan);
-      for (const f of feathers) f.rotation.z = f.userData.a * lerp(0.1, 1, fan) + Math.sin(t * 2 + f.userData.a) * 0.01 * fan;
+      for (let i = 0; i < 17; i++) {
+        fd.position.set(0, 0, -i * 0.003);
+        fd.rotation.set(0, 0, fAng[i] * lerp(0.1, 1, fan) + Math.sin(t * 2 + fAng[i]) * 0.01 * fan);
+        fd.updateMatrix(); feathers.setMatrixAt(i, fd.matrix);
+      }
+      feathers.instanceMatrix.needsUpdate = true;
       const level = 0.74 + 0.25 * seg(p, 0.08, 0.42) - 0.22 * seg(p, 0.45, 0.62);
       water.visible = level > 0.745;
       water.position.y = level;
@@ -517,6 +530,7 @@ function waterPump(ctx, S, D, pos) {
   const hit = box(3.4, 2.8, 3.2, M.hit, D, 0, 1.4, -0.5);
   ctx.waterSpots.push(pos);
 
+  [wheel, hg, lever, rod].forEach((g) => bake(g));
   let theta = 0, speed = 0.9, boostUntil = -1, lastT = 0, prevX = 0, lastStroke = 0;
   const trigger = () => { boostUntil = lastT + 6; ctx.toast('Flood surge — the wheel speeds up'); ctx.sound.pour(pos, 4, 0.45); };
   ctx.addInteractable(hit, 'Double-acting pump — send a surge of water', trigger);
@@ -588,8 +602,10 @@ function saqiya(ctx, S, D, pos) {
   box(0.36, 0.05, 0.06, M.darkWood, ox, 0, 0.74, 0.0);
   // pots on the chain
   const potProf = [[0, 0], [0.04, 0], [0.06, 0.05], [0.055, 0.1], [0.035, 0.13], [0.04, 0.15]];
-  const pots = [];
-  for (let i = 0; i < 16; i++) { const g = new THREE.Group(); D.add(g); lathe(potProf, M.clay, g, 0, -0.075, 0, 12); pots.push(g); }
+  const potGeo = new THREE.LatheGeometry(potProf.map(([r, h]) => new THREE.Vector2(r, h - 0.075)), 12);
+  const pots = new THREE.InstancedMesh(potGeo, M.clay, 16);
+  pots.castShadow = true; D.add(pots);
+  const pd = new THREE.Object3D();
   const Ls = AY - botY, Lp = 2 * Ls + TAU * R;
   const place = (s, g) => {
     s = ((s % Lp) + Lp) % Lp;
@@ -600,7 +616,7 @@ function saqiya(ctx, S, D, pos) {
     else { s -= Ls; const a = Math.PI + s / R; x = R * Math.cos(a); y = botY + R * Math.sin(a); ang = a + Math.PI / 2; }
     const nrm = ang - Math.PI / 2; // outward normal of the loop
     g.position.set(x + Math.cos(nrm) * 0.08, y + Math.sin(nrm) * 0.08, wellZ);
-    g.rotation.z = nrm;
+    g.rotation.set(0, 0, nrm);
   };
   // trough fed by the tipping pots
   box(0.32, 0.05, 1.2, M.darkWood, S, -0.05, 1.45, wellZ);
@@ -613,6 +629,7 @@ function saqiya(ctx, S, D, pos) {
   const hit = box(3.2, 2.4, 3.6, M.hit, D, 0, 1.2, 0);
   ctx.waterSpots.push(pos);
 
+  [pw, vg, shaft].forEach((g) => bake(g));
   let psi = 0, w = 0.35, boostUntil = -1, lastT = 0, step = 0;
   const trigger = () => { boostUntil = lastT + 6; ctx.toast('The water wheel below speeds up'); ctx.sound.bell(pos, 392, 0.5); };
   ctx.addInteractable(hit, 'Saqiya — speed up the hidden water wheel', trigger);
@@ -626,7 +643,8 @@ function saqiya(ctx, S, D, pos) {
       const vang = psi * 1.25;
       vg.rotation.z = vang; pw.rotation.z = vang;
       const chainS = vang * R;
-      pots.forEach((g, i) => place(chainS + i * Lp / pots.length, g));
+      for (let i = 0; i < 16; i++) { place(chainS + i * Lp / 16, pd); pd.updateMatrix(); pots.setMatrixAt(i, pd.matrix); }
+      pots.instanceMatrix.needsUpdate = true;
       const gait = psi * 18;
       const st = Math.floor(gait / Math.PI);
       if (st !== step) { step = st; ctx.sound.clack(pos, 0.12); }
@@ -660,11 +678,14 @@ function castleClock(ctx, S, D, pos) {
   for (let i = -10; i <= 10; i++) cyl(0.012, 0.012, 0.18, M.gold, S, i * 0.21, 2.53, 0.64, 6);
   // lamps, doors, crescent track, zodiac
   const xs = Array.from({ length: 12 }, (_, i) => -2.2 + i * 0.4);
-  const lamps = xs.map((x) => {
-    const m = new THREE.MeshStandardMaterial({ color: 0x2a1a0c, emissive: 0xffb347, emissiveIntensity: 0, roughness: 0.3 });
-    mesh(new THREE.CircleGeometry(0.1, 20), m, D, x, 3.3, 0.112);
+  const lampMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(0.1, 20), new THREE.MeshBasicMaterial({ color: 0xffffff }), 12);
+  D.add(lampMesh);
+  const LAMP_OFF = new THREE.Color(0.04, 0.025, 0.012), LAMP_ON = new THREE.Color(3.2, 1.7, 0.55), lc = new THREE.Color();
+  const lampLvl = new Array(12).fill(0);
+  xs.forEach((x, i) => {
+    lampMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 3.3, 0.112));
+    lampMesh.setColorAt(i, LAMP_OFF);
     mesh(new THREE.TorusGeometry(0.1, 0.014, 6, 20), M.gold, S, x, 3.3, 0.112);
-    return m;
   });
   box(4.95, 0.62, 0.02, M.black, S, 0, 3.9, 0.11);
   box(5.0, 0.04, 0.2, M.gold, S, 0, 3.58, 0.2);
@@ -674,7 +695,6 @@ function castleClock(ctx, S, D, pos) {
     f.group.position.set(x, 3.62, 0.17); f.armR.rotation.x = -1.4 + (i % 3) * 0.3; S.add(f.group);
     const pv = new THREE.Group(); pv.position.set(x - 0.17, 3.9, 0.27); D.add(pv);
     box(0.34, 0.52, 0.025, M.wood, pv, 0.17, 0, 0);
-    sph(0.025, M.gold, pv, 0.17, 0, 0.015, 8);
     pv.userData.target = 0;
     return pv;
   });
@@ -716,6 +736,7 @@ function castleClock(ctx, S, D, pos) {
   });
   const hit = box(6.2, 6.4, 0.3, M.hit, D, 0, 3.2, 0.55);
 
+  falcons.forEach((f) => bake(f));
   const H = 5;
   let clk = 0, hour = 0, dropStart = -99, playStart = -99, side = 0;
   const trigger = () => { clk = (Math.floor(clk / H) + 1) * H - 0.001; };
@@ -739,7 +760,12 @@ function castleClock(ctx, S, D, pos) {
         }
       }
       doors.forEach((d) => { d.rotation.y += (d.userData.target - d.rotation.y) * Math.min(1, dt * 3); });
-      lamps.forEach((m, i) => { const on = hour > i ? 2.6 + Math.sin(t * 6 + i) * 0.15 : 0; m.emissiveIntensity += (on - m.emissiveIntensity) * Math.min(1, dt * 3); });
+      for (let i = 0; i < 12; i++) {
+        const on = hour > i ? 1 + Math.sin(t * 6 + i) * 0.05 : 0;
+        lampLvl[i] += (on - lampLvl[i]) * Math.min(1, dt * 3);
+        lampMesh.setColorAt(i, lc.copy(LAMP_OFF).lerp(LAMP_ON, lampLvl[i]));
+      }
+      lampMesh.instanceColor.needsUpdate = true;
       const cx = hour === 0 ? -2.6 : xs[hour - 1];
       crescent.position.x += (cx - crescent.position.x) * Math.min(1, dt * 2);
       zodiac.rotation.z = -clk * 0.02;
@@ -774,6 +800,8 @@ export function buildExhibits(ctx) {
   ];
   const items = [], colliders = [], plaques = [], spots = [];
   const target = new THREE.Object3D();
+  const fixtures = new THREE.Group(); ctx.scene.add(fixtures);
+  const lensMat = new THREE.MeshBasicMaterial({ color: 0xfff1d8 });
   for (const d of defs) {
     const info = INFO[d.key];
     const root = new THREE.Group(); root.position.set(d.x, 0, d.z); root.rotation.y = d.rot; ctx.scene.add(root);
@@ -796,14 +824,17 @@ export function buildExhibits(ctx) {
     spot.shadow.mapSize.set(1024, 1024);
     spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02;
     spot.shadow.camera.near = 2; spot.shadow.camera.far = 22;
+    spot.shadow.autoUpdate = false; // refreshed by main.js only when the visitor is nearby
+    spot.shadow.needsUpdate = true;
+    spot.userData.target = tg.position;
     ctx.scene.add(spot, tg);
     spots.push(spot);
     // the fixture the light comes from: a black can on a short stem, aimed at the exhibit
-    const fx = new THREE.Group(); fx.position.copy(spot.position); ctx.scene.add(fx);
+    const fx = new THREE.Group(); fx.position.copy(spot.position); fixtures.add(fx);
     cyl(0.015, 0.015, 0.3, M.iron, fx, 0, 0.2, 0, 8);
     const can = cyl(0.09, 0.075, 0.26, M.black, fx, 0, 0, 0, 20);
     can.quaternion.setFromUnitVectors(V(0, 1, 0), spot.position.clone().sub(tg.position).normalize());
-    const lens = mesh(new THREE.CircleGeometry(0.07, 20), new THREE.MeshBasicMaterial({ color: 0xfff1d8 }), can, 0, -0.131, 0);
+    const lens = mesh(new THREE.CircleGeometry(0.07, 20), lensMat, can, 0, -0.131, 0);
     lens.rotation.x = Math.PI / 2;
 
     const side = Math.sign(d.x);
@@ -814,6 +845,7 @@ export function buildExhibits(ctx) {
     colliders.push({ x: pl.x, z: pl.z, r: 0.45 });
     items.push({ name: info.title, x: d.x, z: d.z, update: ex.update });
   }
+  bake(fixtures);
   // welcome plaques near the entrance
   for (const [k, x, r] of [['intro', -3.2, 0.6], ['book', 3.2, -0.6]]) {
     plaques.push(makePlaque(ctx, INFO[k], { x, z: 3.6, rotY: r }));
