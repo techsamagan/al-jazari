@@ -149,6 +149,12 @@ export class Sound {
     this.noiseHit(t, 0.05, out, 0.6, 'bandpass', 2400, 4);
     this.osc('sine', 900, t, 0.04, out, 0.2);
   }
+  rustle(vol = 0.4) { // a page turning
+    const out = this.out(null, vol); if (!out) return;
+    const t = this.ctx.currentTime;
+    this.noiseHit(t, 0.22, out, 0.3, 'bandpass', 2800, 0.6);
+    this.noiseHit(t + 0.12, 0.32, out, 0.2, 'highpass', 3500, 0.5);
+  }
   pour(pos, dur = 3, vol = 0.4, delay = 0) {
     const out = this.out(pos, vol); if (!out) return;
     const ctx = this.ctx, t = ctx.currentTime + delay;

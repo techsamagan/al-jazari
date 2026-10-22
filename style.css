@@ -65,3 +65,96 @@ h1 {
   border: 2px solid rgba(217,178,95,.5); background: rgba(0,0,0,.2); display: none; z-index: 6; pointer-events: none;
 }
 #knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(217,178,95,.55); }
+
+/* ---------- "Open the book" ---------- */
+#book-prompt {
+  position: fixed; left: 50%; bottom: 84px; z-index: 6;
+  transform: translate(-50%, 10px); opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s;
+  font-family: Cinzel, serif; font-weight: 700; font-size: 15px; letter-spacing: .08em;
+  color: #1a1206; background: linear-gradient(#ecca7a, #b2873a); border: 0; border-radius: 24px;
+  padding: 11px 22px; min-height: 44px; box-shadow: 0 0 24px rgba(217,178,95,.45); cursor: pointer; white-space: nowrap;
+}
+#book-prompt.on { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+#book-prompt kbd {
+  font-family: inherit; font-size: 12px; margin-left: 8px; padding: 2px 7px;
+  border: 1px solid rgba(26,18,6,.55); border-radius: 4px; background: rgba(255,255,255,.25);
+}
+
+#book {
+  position: fixed; inset: 0; z-index: 30;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: 16px; background: rgba(8,6,3,.74);
+  opacity: 0; pointer-events: none; transition: opacity .4s ease;
+}
+#book.open { opacity: 1; pointer-events: auto; }
+.book-spread {
+  position: relative; display: flex; container-type: inline-size;
+  width: min(96vw, calc((100vh - 110px) * 1.412));
+  width: min(96vw, calc((100dvh - 110px) * 1.412));
+  aspect-ratio: 1024 / 725; perspective: 2400px;
+  transform: scale(.82) translateY(30px); transition: transform .55s cubic-bezier(.2,.8,.2,1);
+  filter: drop-shadow(0 24px 40px rgba(0,0,0,.65));
+}
+#book.open .book-spread { transform: none; }
+.page { position: relative; flex: 1 1 50%; min-width: 0; background: url(assets/book/old_book.jpg) no-repeat; background-size: 200% 100%; }
+.page.left { background-position: left center; }
+.page.right { background-position: right center; }
+.book-canvas { position: absolute; top: 6%; bottom: 6%; left: 9%; right: 7%; width: 84%; height: 88%; transition: opacity .25s; }
+.book-canvas { /* fade the drawing out softly at its edges when zoomed in */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent), linear-gradient(to bottom, transparent, #000 5%, #000 95%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent), linear-gradient(to bottom, transparent, #000 5%, #000 95%, transparent);
+  mask-composite: intersect;
+}
+.page-inner {
+  position: absolute; inset: 8% 11% 7% 8%; overflow-y: auto; touch-action: pan-y;
+  display: flex; flex-direction: column; color: #3a2614; transition: opacity .25s;
+  -webkit-user-select: text; user-select: text;
+}
+.book-spread.turning .book-canvas, .book-spread.turning .page-inner { opacity: 0; }
+.book-kicker { margin: 0; font-family: Cinzel, serif; font-size: 1.5cqw; letter-spacing: .14em; color: #8a5a1a; text-transform: uppercase; }
+.book-kicker.ar { font-family: Amiri, serif; font-size: 2.6cqw; letter-spacing: 0; text-transform: none; direction: rtl; text-align: left; }
+.book-title { margin: .2em 0 .5em; font-family: Cinzel, serif; font-weight: 700; font-size: 2.9cqw; line-height: 1.15; color: #6b1e14; }
+.book-text { font-size: 2.1cqw; line-height: 1.5; }
+.book-text .s { cursor: pointer; border-radius: 3px; transition: background-color .3s, color .3s; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.book-text .s:hover { background: rgba(201,151,58,.14); }
+.book-text .s.now { background: rgba(201,151,58,.38); color: #1f1208; }
+.book-pno { margin: auto 0 0; padding-top: .8em; text-align: center; font-style: italic; font-size: 1.4cqw; opacity: .7; }
+
+.leaf { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; display: none; transform-origin: left center; transform-style: preserve-3d; pointer-events: none; }
+.leaf > div { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: url(assets/book/old_book.jpg) no-repeat; background-size: 200% 100%; }
+.leaf .front { background-position: right center; box-shadow: inset 30px 0 40px -20px rgba(0,0,0,.35); }
+.leaf .back { background-position: left center; transform: rotateY(180deg); box-shadow: inset -30px 0 40px -20px rgba(0,0,0,.35); }
+
+.book-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.book-bar button {
+  font-family: Cinzel, serif; font-weight: 700; font-size: 14px; letter-spacing: .08em;
+  min-height: 44px; padding: 10px 18px; border-radius: 22px; cursor: pointer;
+  color: #f6e2ac; background: rgba(24,17,8,.9); border: 1px solid rgba(217,178,95,.55);
+}
+.book-bar button:hover:not(:disabled) { background: rgba(60,42,18,.95); }
+.book-bar button:disabled { opacity: .35; cursor: default; }
+.book-bar button:focus-visible { outline: 2px solid var(--turq); outline-offset: 2px; }
+.book-bar .b-next { color: #1a1206; background: linear-gradient(#ecca7a, #b2873a); border-color: transparent; }
+.book-bar .b-next:hover:not(:disabled) { background: linear-gradient(#f3d68e, #c09445); }
+.book-bar .b-next.pulse { animation: bookPulse 1.4s ease-in-out infinite; }
+@keyframes bookPulse { 50% { box-shadow: 0 0 0 6px rgba(217,178,95,.35); } }
+
+/* phones held upright: drawing on top, text below */
+@media (orientation: portrait) and (max-width: 820px) {
+  #book { padding: 12px 12px 14px; gap: 10px; }
+  .book-spread { flex-direction: column; width: 100%; height: calc(100vh - 100px); height: calc(100dvh - 100px); aspect-ratio: auto; }
+  .page.left { flex: 0 0 55%; }
+  .page.right { flex: 1 1 auto; }
+  .book-canvas { top: 5%; bottom: 3%; left: 6%; right: 6%; width: 88%; height: 92%; }
+  .page-inner { inset: 6% 9% 5% 8%; }
+  .book-kicker { font-size: 12px; }
+  .book-kicker.ar { font-size: 20px; }
+  .book-title { font-size: 21px; }
+  .book-text { font-size: 16px; }
+  .book-pno { font-size: 13px; }
+  .book-bar button { padding: 8px 13px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-spread, #book, .book-canvas, .page-inner { transition: none; }
+}

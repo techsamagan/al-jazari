@@ -7,6 +7,7 @@ import { buildHall } from './hall.js';
 import { buildExhibits } from './exhibits.js';
 import { Controls } from './controls.js';
 import { Sound } from './audio.js';
+import { Book, hasBook } from './book.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -146,7 +147,7 @@ rig.add(camera);
 scene.add(rig);
 
 const sound = new Sound();
-let hall, exhibits, controls;
+let hall, exhibits, controls, book;
 let toastText = '', toastUntil = 0;
 
 const ctx = {
@@ -188,6 +189,21 @@ async function init() {
     $('reticle').style.display = locked ? 'block' : 'none';
     $('hint').style.display = !locked && started && !renderer.xr.isPresenting ? 'block' : 'none';
   };
+  book = new Book({
+    sound, isTouch,
+    onOpen() {
+      controls.enabled = false;
+      controls.keys = {}; controls.move.set(0, 0); controls.vel.set(0, 0, 0);
+      $('stick').style.display = 'none';
+      if (controls.locked) document.exitPointerLock();
+      $('hud').style.display = 'none';
+    },
+    onClose() {
+      $('hud').style.display = '';
+      controls.enabled = true;
+      if (!isTouch) controls.lock();
+    },
+  });
   // the HDRI is a bright gallery; keep it as subtle bounce light + reflections
   scene.traverse((o) => {
     if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
@@ -257,6 +273,8 @@ const clock = new THREE.Clock();
 const head = new THREE.Vector3();
 let lastLabel = '', lastCursor = '';
 function loop() {
+  // while the book is open the hall stands still (its last frame stays on screen) to save power
+  if (book.isOpen) { clock.getDelta(); return; }
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
   renderer.info.reset();
   monitor(raw);
@@ -288,6 +306,16 @@ function loop() {
     let best = 4.8;
     for (const it of exhibits.items) { const d = Math.hypot(it.x - head.x, it.z - head.z); if (d < best) { best = d; label = it.name; } }
   }
+  let near = null;
+  if (started && !renderer.xr.isPresenting) {
+    let best = 5.2;
+    for (const it of exhibits.items) {
+      if (!hasBook(it.key)) continue;
+      const d = Math.hypot(it.x - head.x, it.z - head.z);
+      if (d < best) { best = d; near = it.key; }
+    }
+  }
+  book.setNearby(near);
   if (label !== lastLabel) { lastLabel = label; const el = $('label'); el.textContent = label; el.classList.toggle('on', !!label); }
 
   if (post && !renderer.xr.isPresenting) post.render(dt);
