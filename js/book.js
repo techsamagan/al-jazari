@@ -1,8 +1,14 @@
 // "Open the book": near an exhibit, a visitor can open an old book with an animated drawing
 // of the machine on the left page and a narrated explanation on the right page.
 import { elephant } from './book-elephant.js';
+import { boat } from './book-boat.js';
+import { peacock_ as peacock } from './book-peacock.js';
+import { drink } from './book-drink.js';
+import { pump } from './book-pump.js';
+import { saqiya } from './book-saqiya.js';
+import { castle } from './book-castle.js';
 
-const BOOKS = { elephant };
+const BOOKS = { elephant, boat, peacock, drink, pump, saqiya, castle };
 const FULL = [0, 0, 500, 700];
 export const hasBook = (key) => !!BOOKS[key];
 
@@ -213,14 +219,27 @@ export class Book {
     this.book.pages[this.page].scene.draw(g, (now - this.t0) / 1000, (name) => this.fx(name), view, k);
   }
 
+  // sounds the drawings ask for: 'name' or 'name:number' (a pitch in Hz)
   fx(name) {
     const S = this.sound;
     if (!S.ctx) return;
-    if (name === 'click') S.clack(null, 0.3);
-    else if (name === 'clang') S.bell(null, 660, 0.4);
-    else if (name === 'drum') { S.drum(null, 0.55, 0.8); S.cymbal(null, 0.2, 0.02); }
-    else if (name === 'drum2') S.drum(null, 0.55, 0.8);
-    else if (name === 'whistle') { S.flute(null, 1180, 0.12, 0.16); S.flute(null, 1400, 0.1, 0.16, 0.15); }
+    const [n, arg] = name.split(':'), f = +arg;
+    switch (n) {
+      case 'click': S.clack(null, 0.3); break;
+      case 'tek': S.tek(null, 0.18); break;
+      case 'clang': S.bell(null, 660, 0.4); break;
+      case 'bell': S.bell(null, f || 1046, 0.3); break;
+      case 'chime': S.bell(null, 784, 0.32); S.bell(null, 1175, 0.2, 0.12); break;
+      case 'drum': S.drum(null, 0.55, 0.8); S.cymbal(null, 0.2, 0.02); break;
+      case 'drum2': S.drum(null, 0.55, 0.8); break;
+      case 'drumHi': S.drum(null, 0.5, 1.2); break;
+      case 'cymbal': S.cymbal(null, 0.25); break;
+      case 'whistle': S.flute(null, 1180, 0.12, 0.16); S.flute(null, 1400, 0.1, 0.16, 0.15); break;
+      case 'flute': S.flute(null, f || 440, 0.17, 0.3); break;
+      case 'trumpet': S.trumpet(null, f || 293.66, 0.45, 0.25); break;
+      case 'pour': S.pour(null, f || 2.5, 0.28); break;
+      case 'splash': S.pour(null, 0.5, 0.18); break;
+    }
   }
 
   // ---------- narration ----------

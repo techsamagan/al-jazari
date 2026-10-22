@@ -2,20 +2,11 @@
 // style of al-Jazari's manuscript and a short text the narrator reads aloud.
 // Drawings use a 500 × 700 canvas; book.js scales them to fit the page.
 
-const TAU = Math.PI * 2, PI = Math.PI;
-const INK = '#3a2614', RED = '#a3342a', LAPIS = '#2e4b8a', GOLD = '#c9973a', BRASS = '#d9b45a',
-  GREEN = '#4d7a45', GREY = '#9b958c', GREY2 = '#7f7a72', STONE = '#dccca4', IVORY = '#f3ead6',
-  SKIN = '#c98f5f', COPPER = '#b4723a', BALL = '#7d5b2e', WATER = 'rgba(60,120,180,0.5)', WATER2 = 'rgba(40,95,160,0.75)';
+import { TAU, PI, C, lerp, ease, seg, paint, dot, makeScene } from './book-draw.js';
 
-const lerp = (a, b, p) => a + (b - a) * p;
-const ease = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p * p * (3 - 2 * p));
-const seg = (t, a, b) => ease((t - a) / (b - a)); // 0 before a, 1 after b, smooth between
-
-function paint(g, fill, stroke = INK, lw = 2) {
-  if (fill) { g.fillStyle = fill; g.fill(); }
-  if (stroke) { g.lineWidth = lw; g.strokeStyle = stroke; g.stroke(); }
-}
-function dot(g, x, y, r, fill, stroke = null) { g.beginPath(); g.arc(x, y, r, 0, TAU); paint(g, fill, stroke, 1); }
+const { ink: INK, red: RED, lapis: LAPIS, gold: GOLD, brass: BRASS, green: GREEN, grey: GREY, grey2: GREY2,
+  stone: STONE, ivory: IVORY, skin: SKIN, copper: COPPER } = C;
+const BALL = '#7d5b2e', WATER = C.water, WATER2 = C.water2;
 
 // ---------------------------------------------------------------- the machine's timeline
 // One full half-hour cycle, sped up to 12 seconds.
@@ -247,59 +238,15 @@ function drawClock(g, s, t, cut) {
   if (s.ball) dot(g, s.ball[0], s.ball[1], 5, BALL, INK);
 }
 
-// ---------------------------------------------------------------- labels and highlights
-// k (from book.js) scales labels, rings and the minutes box so they keep the same size on screen
-// while the drawing zooms in.
-function label(g, text, x, y, tx, ty, k) {
-  g.save();
-  g.font = `italic ${20 * k}px "EB Garamond", Georgia, serif`;
-  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-  g.strokeStyle = RED; g.lineWidth = 1.3 * k;
-  g.beginPath(); g.moveTo(tx, y > ty ? ty + 6 * k : ty - 18 * k); g.lineTo(x, y); g.stroke();
-  dot(g, x, y, 2.8 * k, RED);
-  g.lineJoin = 'round';
-  g.lineWidth = 5 * k; g.strokeStyle = 'rgba(238,224,192,0.92)'; g.strokeText(text, tx, ty);
-  g.fillStyle = '#7d2118'; g.fillText(text, tx, ty);
-  g.restore();
-}
-function ring(g, x, y, r, t, k) {
-  g.save();
-  g.setLineDash([7 * k, 5 * k]); g.lineDashOffset = -t * 14 * k;
-  g.beginPath(); g.arc(x, y, r + Math.sin(t * 3) * 2.5 * k, 0, TAU);
-  g.lineWidth = 2.6 * k; g.strokeStyle = 'rgba(201,151,58,0.95)'; g.stroke();
-  g.restore();
-}
-function minutesBox(g, s, view, k) {
-  const m = Math.floor(s.minutes);
-  g.save();
-  g.translate(view[0] + 8 * k, view[1] + 6 * k); g.scale(k, k);
-  g.beginPath(); g.roundRect(0, 0, 186, 36, 6); paint(g, 'rgba(243,234,214,0.8)', GOLD, 1.5);
-  g.font = '600 18px "EB Garamond", Georgia, serif'; g.fillStyle = INK; g.textBaseline = 'middle';
-  g.fillText(m >= 30 ? 'Half an hour has passed!' : `Minutes passed: ${m}`, 12, 19);
-  g.restore();
-}
-
-const crossed = (a, b, at) => (a <= b ? a < at && b >= at : at > a || at <= b);
-
-function scene({ cut = true, offset = 0, labels = [], focus = null }) {
-  let prev = -1;
-  return {
-    reset() { prev = -1; },
-    draw(g, t, fx, view, k) {
-      const tc = (t + offset) % T;
-      if (prev >= 0) for (const [at, name] of EVENTS) if (crossed(prev, tc, at)) fx(name);
-      prev = tc;
-      const s = cycle(tc);
-      drawClock(g, s, t, cut);
-      if (focus) { const [x, y, r] = focus(s, tc); if (r) ring(g, x, y, r, t, k); }
-      for (const L of labels) {
-        const [x, y] = typeof L.at === 'function' ? L.at(s) : L.at;
-        label(g, L.text, x, y, L.tx, L.ty, k);
-      }
-      if (cut) minutesBox(g, s, view, k);
-    },
-  };
-}
+const scene = makeScene({
+  T, events: EVENTS, cycle,
+  draw: (g, s, t, f) => drawClock(g, s, t, f.cut !== false),
+  info: (s, f) => {
+    if (f.cut === false) return null;
+    const m = Math.floor(s.minutes);
+    return m >= 30 ? 'Half an hour has passed!' : `Minutes passed: ${m}`;
+  },
+});
 
 // ---------------------------------------------------------------- the pages
 export const elephant = {

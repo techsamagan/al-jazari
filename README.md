@@ -16,13 +16,13 @@ and works on desktop, phone and VR headsets (Meta Quest, Pico, Vision Pro, and o
 | 6 | Saqiya | A model horse rides the sweep while gears drive a chain of pots that lift water from the well |
 | 7 | Castle Clock | Doors open hourly, falcons drop balls, musicians play, lamps light, zodiac turns |
 
-**The Book of the machine.** Stand near the Elephant Clock and press **B** (or tap *Open the book*). An old book
-opens with an animated drawing of how the clock works on the left page and a short explanation on the right,
+**The Book of each machine.** Stand near any machine and press **B** (or tap *Open the book*). An old book
+opens with an animated drawing of how the machine works on the left page and a short explanation on the right,
 read aloud by the browser's built-in voice (each sentence lights up as it is read). ← → turn pages, Space turns
-the voice on/off, Esc closes. **In VR**, point at the closed book on the stand beside the plaque and pull the trigger: the book opens
+the voice on/off, Esc closes. **In VR**, point at the closed book on the stand beside any plaque and pull the trigger: the book opens
 life-size in front of you, with Back / Voice / Next / Close buttons you point at. (On desktop and phones,
-clicking or tapping that closed book also opens the on-screen book.) Pages live in `js/book-elephant.js`; to add a book for another machine, copy that
-file and register it in `js/book.js`.
+clicking or tapping that closed book also opens the on-screen book.) Each machine's pages live in its own `js/book-<machine>.js` file (shared drawing helpers in
+`js/book-draw.js`); books are registered in `js/book.js`.
 
 All sound is synthesized live in the browser (drums, flute in maqam Hijaz, bells, trumpets, water).
 
@@ -70,7 +70,8 @@ js/textures.js      procedural patterns (tiles, calligraphy, zodiac, feathers…
 js/controls.js      desktop / touch / WebXR controls
 js/audio.js         synthesized spatial audio
 js/book.js          the "Open the book" overlay: page turns, narration, buttons
-js/book-elephant.js the Elephant Clock's book pages and animated drawings
+js/book-draw.js     shared drawing kit for the books (labels, gears, figures, timeline)
+js/book-*.js        one book per machine: elephant, boat, peacock, drink, pump, saqiya, castle
 js/book-vr.js       the book in VR (floating pages + buttons) and the closed book on the plaque stand
 tools/fetch_assets.py  downloads the CC0 assets into assets/ (about 48 MB)
 ```

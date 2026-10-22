@@ -318,7 +318,8 @@ function loop() {
     let best = 5.2;
     for (const it of exhibits.items) {
       if (!hasBook(it.key)) continue;
-      const d = Math.hypot(it.x - head.x, it.z - head.z);
+      // near the machine or at its plaque (the Castle Clock's plaque stands well away from it)
+      const d = Math.min(Math.hypot(it.x - head.x, it.z - head.z), Math.hypot(it.plaque.x - head.x, it.plaque.z - head.z) + 1);
       if (d < best) { best = d; near = it.key; }
     }
   }
