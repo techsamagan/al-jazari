@@ -9,9 +9,11 @@ export const hasBook = (key) => !!BOOKS[key];
 const VOICE_PREFS = ['Google UK English Male', 'Daniel', 'Google UK English Female', 'Google US English', 'Samantha', 'Microsoft Ryan', 'Microsoft Sonia', 'Microsoft Guy', 'Microsoft Aria', 'Karen', 'Moira'];
 
 export class Book {
-  constructor({ sound, isTouch, onOpen, onClose }) {
-    Object.assign(this, { sound, isTouch, onOpen, onClose });
+  constructor({ sound, isTouch, onOpen, onClose, vrView = null }) {
+    Object.assign(this, { sound, isTouch, onOpen, onClose, vrView });
     this.isOpen = false; this.nearby = null; this.voiceOn = true;
+    this.mode = 'dom'; // 'dom' = on-screen book, 'vr' = floating book in the headset
+    this.hl = -1;      // sentence being read aloud
     this.page = 0; this.turning = false; this.speakToken = 0;
     this.synth = window.speechSynthesis || null;
 
@@ -42,7 +44,7 @@ export class Book {
     if (!this.synth) this.voiceBtn.style.display = 'none';
 
     this.prevBtn.addEventListener('click', () => this.goto(this.page - 1));
-    this.nextBtn.addEventListener('click', () => (this.page < this.book.pages.length - 1 ? this.goto(this.page + 1) : this.close()));
+    this.nextBtn.addEventListener('click', () => this.nextOrFinish());
     this.voiceBtn.addEventListener('click', () => this.setVoice(!this.voiceOn));
     q('.b-close').addEventListener('click', () => this.close());
     this.textEl.addEventListener('click', (e) => {
@@ -58,7 +60,7 @@ export class Book {
 
     addEventListener('keydown', (e) => {
       if (e.code === 'KeyB' && !e.repeat) { if (this.isOpen) this.close(); else if (this.nearby) this.open(this.nearby); return; }
-      if (!this.isOpen) return;
+      if (!this.isOpen || this.mode !== 'dom') return;
       if (e.code === 'Escape') this.close();
       else if (e.code === 'ArrowRight' || e.code === 'PageDown') this.goto(this.page + 1);
       else if (e.code === 'ArrowLeft' || e.code === 'PageUp') this.goto(this.page - 1);
@@ -92,23 +94,38 @@ export class Book {
     const b = BOOKS[key];
     if (!b || this.isOpen) return;
     this.book = b; this.page = 0; this.isOpen = true;
-    this.el.classList.add('open'); this.el.setAttribute('aria-hidden', 'false');
+    this.mode = this.vrView && this.vrView.isPresenting() ? 'vr' : 'dom';
     this.prompt.classList.remove('on');
-    this.onOpen && this.onOpen();
     this.sound.rustle && this.sound.rustle(0.5);
-    this.render();
-    this.raf = requestAnimationFrame(this.frame);
+    if (this.mode === 'vr') {
+      this.render();
+      this.vrView.show(this); // drawn from the main loop: window animation frames pause inside VR
+    } else {
+      this.el.classList.add('open'); this.el.setAttribute('aria-hidden', 'false');
+      this.onOpen && this.onOpen();
+      this.render();
+      this.raf = requestAnimationFrame(this.frame);
+      this.nextBtn.focus({ preventScroll: true });
+    }
     setTimeout(() => this.isOpen && this.speak(0), 450);
-    this.nextBtn.focus({ preventScroll: true });
   }
+
+  nextOrFinish() {
+    if (!this.isOpen) return;
+    if (this.page < this.book.pages.length - 1) this.goto(this.page + 1); else this.close();
+  }
+
+  // called every frame by the main loop while the book is open in VR
+  updateVR(now, hovered) { if (this.isOpen && this.mode === 'vr') this.vrView.update(now, hovered); }
 
   close() {
     if (!this.isOpen) return;
     this.stopSpeech();
     this.isOpen = false; this.turning = false;
+    this.prompt.classList.toggle('on', !!this.nearby);
+    if (this.mode === 'vr') { this.vrView.hide(); return; }
     cancelAnimationFrame(this.raf);
     this.el.classList.remove('open'); this.el.setAttribute('aria-hidden', 'true');
-    this.prompt.classList.toggle('on', !!this.nearby);
     this.onClose && this.onClose();
   }
 
@@ -118,8 +135,9 @@ export class Book {
     this.stopSpeech();
     this.turning = true;
     this.sound.rustle && this.sound.rustle(0.4);
-    const flat = matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
+    const flat = this.mode === 'vr' || matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
     this.spread.classList.add('turning');
+    if (this.mode === 'vr') this.vrView.renderPage(); // blank pages for a moment, like turning a leaf
     if (!flat && this.leaf.animate) {
       this.leaf.style.display = 'block';
       const a = this.leaf.animate(
@@ -131,6 +149,7 @@ export class Book {
     setTimeout(() => {
       this.spread.classList.remove('turning');
       this.turning = false;
+      if (this.isOpen && this.mode === 'vr') this.vrView.renderPage();
       if (this.isOpen) this.speak(0);
     }, 680);
   }
@@ -157,7 +176,9 @@ export class Book {
     this.view = (b.view || FULL).slice();
     this.viewTarget = p.view || b.view || FULL;
     this.lastNow = 0;
-    this.sizeCanvas();
+    this.hl = -1;
+    if (this.mode === 'dom') this.sizeCanvas();
+    else this.vrView.renderPage();
   }
 
   sizeCanvas() {
@@ -167,11 +188,18 @@ export class Book {
   }
 
   frame(now) {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.mode !== 'dom') return;
     this.raf = requestAnimationFrame(this.frame);
-    const c = this.canvas, g = this.g;
+    // labels keep a steady on-screen size: about 18px on a computer, 14px on a phone
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    this.drawScene(this.g, this.canvas.width, this.canvas.height, (innerWidth < 700 ? 14 : 18) * dpr, now);
+  }
+
+  // Draws the current page's animated drawing into a w × h canvas.
+  // labelPx = label text height in that canvas's pixels.
+  drawScene(g, w, h, labelPx, now) {
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, c.width, c.height);
+    g.clearRect(0, 0, w, h);
     const dt = this.lastNow ? Math.min(0.1, (now - this.lastNow) / 1000) : 0;
     this.lastNow = now;
     if (now - this.t0 > 700) { // wait a moment, then glide in
@@ -179,11 +207,9 @@ export class Book {
       for (let i = 0; i < 4; i++) this.view[i] += (this.viewTarget[i] - this.view[i]) * a;
     }
     const view = this.view, [vx, vy, vw, vh] = view; // the part of the drawing to show
-    const s = Math.min(c.width / vw, c.height / vh);
-    g.setTransform(s, 0, 0, s, (c.width - vw * s) / 2 - vx * s, (c.height - vh * s) / 2 - vy * s);
-    // labels keep a steady on-screen size: about 18px on a computer, 14px on a phone
-    const cssPerUnit = s / Math.min(devicePixelRatio || 1, 2), labelPx = innerWidth < 700 ? 14 : 18;
-    const k = labelPx / 20 / cssPerUnit;
+    const s = Math.min(w / vw, h / vh);
+    g.setTransform(s, 0, 0, s, (w - vw * s) / 2 - vx * s, (h - vh * s) / 2 - vy * s);
+    const k = labelPx / 20 / s;
     this.book.pages[this.page].scene.draw(g, (now - this.t0) / 1000, (name) => this.fx(name), view, k);
   }
 
@@ -211,10 +237,14 @@ export class Book {
     this.voiceBtn.textContent = this.voiceOn ? '🔊 Voice on' : '🔇 Voice off';
     this.voiceBtn.setAttribute('aria-pressed', String(this.voiceOn));
     if (this.voiceOn) this.speak(from); else this.stopSpeech();
+    if (this.isOpen && this.mode === 'vr') this.vrView.drawButtons();
   }
 
   highlight(i) {
+    if (i === this.hl) return;
+    this.hl = i;
     for (const s of this.textEl.children) s.classList.toggle('now', +s.dataset.i === i);
+    if (this.isOpen && this.mode === 'vr') this.vrView.drawText();
   }
 
   speak(from) {

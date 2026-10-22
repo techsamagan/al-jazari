@@ -19,7 +19,9 @@ and works on desktop, phone and VR headsets (Meta Quest, Pico, Vision Pro, and o
 **The Book of the machine.** Stand near the Elephant Clock and press **B** (or tap *Open the book*). An old book
 opens with an animated drawing of how the clock works on the left page and a short explanation on the right,
 read aloud by the browser's built-in voice (each sentence lights up as it is read). ← → turn pages, Space turns
-the voice on/off, Esc closes. Pages live in `js/book-elephant.js`; to add a book for another machine, copy that
+the voice on/off, Esc closes. **In VR**, point at the closed book on the stand beside the plaque and pull the trigger: the book opens
+life-size in front of you, with Back / Voice / Next / Close buttons you point at. (On desktop and phones,
+clicking or tapping that closed book also opens the on-screen book.) Pages live in `js/book-elephant.js`; to add a book for another machine, copy that
 file and register it in `js/book.js`.
 
 All sound is synthesized live in the browser (drums, flute in maqam Hijaz, bells, trumpets, water).
@@ -69,6 +71,7 @@ js/controls.js      desktop / touch / WebXR controls
 js/audio.js         synthesized spatial audio
 js/book.js          the "Open the book" overlay: page turns, narration, buttons
 js/book-elephant.js the Elephant Clock's book pages and animated drawings
+js/book-vr.js       the book in VR (floating pages + buttons) and the closed book on the plaque stand
 tools/fetch_assets.py  downloads the CC0 assets into assets/ (about 48 MB)
 ```
 

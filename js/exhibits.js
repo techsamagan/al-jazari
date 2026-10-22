@@ -843,7 +843,7 @@ export function buildExhibits(ctx) {
       : { x: side * 2.7, z: d.z + 3.6, rotY: -side * 0.45 };
     plaques.push(makePlaque(ctx, info, { ...pl, onActivate: ex.trigger, activateLabel: info.activate }));
     colliders.push({ x: pl.x, z: pl.z, r: 0.45 });
-    items.push({ key: d.key, name: info.title, x: d.x, z: d.z, update: ex.update });
+    items.push({ key: d.key, name: info.title, x: d.x, z: d.z, plaque: pl, update: ex.update });
   }
   bake(fixtures);
   // welcome plaques near the entrance

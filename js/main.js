@@ -8,6 +8,7 @@ import { buildExhibits } from './exhibits.js';
 import { Controls } from './controls.js';
 import { Sound } from './audio.js';
 import { Book, hasBook } from './book.js';
+import { VRBookView, makeBookStand } from './book-vr.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -178,6 +179,8 @@ async function init() {
   initMaterials();
   hall = buildHall(scene);
   exhibits = buildExhibits(ctx);
+  // a closed book beside each plaque that has one: point at it (VR) or click / tap it to open
+  for (const it of exhibits.items) if (hasBook(it.key)) makeBookStand(ctx, it.plaque, () => book.open(it.key));
   controls = new Controls({
     renderer, camera, rig, scene, isTouch,
     floor: hall.floor,
@@ -191,6 +194,7 @@ async function init() {
   };
   book = new Book({
     sound, isTouch,
+    vrView: new VRBookView({ renderer, scene, camera, ctx }),
     onOpen() {
       controls.enabled = false;
       controls.keys = {}; controls.move.set(0, 0); controls.vel.set(0, 0, 0);
@@ -250,6 +254,7 @@ if (navigator.xr) {
   }).catch(() => {});
 }
 renderer.xr.addEventListener('sessionstart', () => {
+  if (book) book.close(); // an on-screen book can't be seen in the headset
   start();
   for (const l of exhibits.spots) l.castShadow = false; // keep the headset at frame rate
   renderer.shadowMap.autoUpdate = false;
@@ -257,6 +262,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   $('hint').style.display = 'none';
 });
 renderer.xr.addEventListener('sessionend', () => {
+  if (book) book.close();
   for (const l of exhibits.spots) l.castShadow = true;
   renderer.shadowMap.autoUpdate = true;
 });
@@ -274,12 +280,13 @@ const head = new THREE.Vector3();
 let lastLabel = '', lastCursor = '';
 function loop() {
   // while the book is open the hall stands still (its last frame stays on screen) to save power
-  if (book.isOpen) { clock.getDelta(); return; }
+  if (book.isOpen && book.mode === 'dom') { clock.getDelta(); return; }
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
   renderer.info.reset();
   monitor(raw);
   if (!renderer.xr.isPresenting) scheduleShadows();
   controls.update(dt);
+  book.updateVR(performance.now(), controls.hovered);
   hall.update(t, dt);
   exhibits.update(t, dt);
   for (const a of animated) { a.tex.offset.x += a.speed[0] * dt; a.tex.offset.y += a.speed[1] * dt; }
